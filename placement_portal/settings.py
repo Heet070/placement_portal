@@ -28,7 +28,7 @@ ALLOWED_HOSTS = os.environ.get(
 ).split(',')
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://placementstatsdau.up.railway.app"
+    "https://placementstatsdau.up.railway.app",
 ]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -36,10 +36,8 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
-CSRF_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_SAMESITE = 'Lax'
-
-SECURE_SSL_REDIRECT = False
+CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SAMESITE = "Lax"
 
 # -------------------------------------------------------------------
 # APPLICATIONS
