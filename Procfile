@@ -1,0 +1,1 @@
+web: gunicorn placement_portal.wsgi --log-file -
