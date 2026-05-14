@@ -1,0 +1,272 @@
+{% extends 'portal/base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="fw-bold mb-1">Analytics</h2>
+    <p class="text-muted mb-4">Placement statistics by drive and branch</p>
+
+    <ul class="nav nav-tabs mb-4" id="analyticsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button">
+                <i class="fa fa-chart-bar me-2"></i>Drive Statistics
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- STATS TAB -->
+        <div class="tab-pane fade show active" id="stats" role="tabpanel">
+
+            {% if not drive_stats %}
+                <div class="alert alert-info">No active drives found.</div>
+            {% endif %}
+
+            {% if drive_stats|length > 1 %}
+            <div class="mb-4 d-flex flex-wrap gap-2">
+                {% for ds in drive_stats %}
+                <button class="btn btn-sm {% if forloop.first %}btn-primary{% else %}btn-outline-primary{% endif %} drive-pill"
+                        data-target="drive-{{ ds.drive.drive_id }}">
+                    {% if ds.is_si %}<i class="fa fa-sun me-1"></i>{% else %}<i class="fa fa-building me-1"></i>{% endif %}
+                    {{ ds.drive.drive_name }} {{ ds.drive.drive_year }}
+                    <span class="badge {% if ds.is_si %}bg-warning text-dark{% else %}bg-success{% endif %} ms-1">
+                        {% if ds.is_si %}SI{% else %}PD{% endif %}
+                    </span>
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% for ds in drive_stats %}
+            <div class="drive-section {% if not forloop.first %}d-none{% endif %}" id="drive-{{ ds.drive.drive_id }}">
+
+                <!-- Drive header -->
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div>
+                        <h4 class="mb-0 fw-bold">{{ ds.drive.drive_name }} {{ ds.drive.drive_year }}</h4>
+                        <span class="text-muted small">{{ ds.drive.drive_id }}</span>
+                    </div>
+                    <span class="badge {% if ds.is_si %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                        {% if ds.is_si %}Summer Internship Drive{% else %}Placement Drive{% endif %}
+                    </span>
+                </div>
+
+                <!-- Stat cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold text-primary">{{ ds.total }}</div>
+                                <div class="text-muted small">Total Students</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold {% if ds.is_si %}text-warning{% else %}text-success{% endif %}">
+                                    {{ ds.primary_count }}
+                                </div>
+                                <div class="text-muted small">
+                                    {% if ds.is_si %}Summer Internship{% else %}Placed + PPO{% endif %}
+                                    <span class="badge {% if ds.is_si %}bg-warning text-dark{% else %}bg-success{% endif %} ms-1">
+                                        {{ ds.overall_pct }}%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% if not ds.is_si %}
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold text-info">{{ ds.placed }}</div>
+                                <div class="text-muted small">Placed</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold" style="color:#0dcaf0;">{{ ds.ppo }}</div>
+                                <div class="text-muted small">PPO</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold text-danger">{{ ds.unplaced }}</div>
+                                <div class="text-muted small">Unplaced</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold text-success">
+                                    {% if ds.avg_ctc %}₹{{ ds.avg_ctc }} L{% else %}—{% endif %}
+                                </div>
+                                <div class="text-muted small">
+                                    Avg {% if ds.is_si %}Stipend{% else %}Package{% endif %} (Overall)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold text-primary">
+                                    {% if ds.median_ctc %}₹{{ ds.median_ctc }} L{% else %}—{% endif %}
+                                </div>
+                                <div class="text-muted small">
+                                    Median {% if ds.is_si %}Stipend{% else %}Package{% endif %} (Overall)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center py-3">
+                                <div class="fs-2 fw-bold" style="color:#8e44ad;">
+                                    {% if ds.highest_ctc %}₹{{ ds.highest_ctc }} L{% else %}—{% endif %}
+                                </div>
+                                <div class="text-muted small">
+                                    Highest {% if ds.is_si %}Stipend{% else %}Package{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Branch-wise table -->
+                <div class="card border-0 shadow-sm mb-5">
+                    <div class="card-header bg-white border-bottom d-flex align-items-center gap-2 py-3">
+                        <i class="fa fa-code-branch text-primary"></i>
+                        <h6 class="mb-0 fw-bold">Branch-wise Breakdown</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if ds.branches %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Branch</th>
+                                        <th class="text-center">Total</th>
+                                        {% if ds.is_si %}
+                                            <th class="text-center text-warning">SI Students</th>
+                                        {% else %}
+                                            <th class="text-center">Placed</th>
+                                            <th class="text-center">PPO</th>
+                                            <th class="text-center">Placed+PPO</th>
+                                        {% endif %}
+                                        <th class="text-center">Unplaced</th>
+                                        <th class="text-center">
+                                            {% if ds.is_si %}SI %{% else %}Placement %{% endif %}
+                                        </th>
+                                        <th class="text-center">
+                                            Avg {% if ds.is_si %}Stipend{% else %}Pkg{% endif %}
+                                        </th>
+                                        <th class="text-center">
+                                            Median {% if ds.is_si %}Stipend{% else %}Pkg{% endif %}
+                                        </th>
+                                        <th class="text-center">
+                                            Highest {% if ds.is_si %}Stipend{% else %}Pkg{% endif %}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for b in ds.branches %}
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">{{ b.branch_name }}</div>
+                                            <div class="text-muted" style="font-size:.72rem;">{{ b.branch_id }}</div>
+                                        </td>
+                                        <td class="text-center fw-bold">{{ b.total }}</td>
+                                        {% if ds.is_si %}
+                                            <td class="text-center">
+                                                <span class="badge bg-warning text-dark">{{ b.si }}</span>
+                                            </td>
+                                        {% else %}
+                                            <td class="text-center"><span class="badge bg-success">{{ b.placed }}</span></td>
+                                            <td class="text-center"><span class="badge bg-info">{{ b.ppo }}</span></td>
+                                            <td class="text-center"><span class="badge bg-primary px-3" style="font-size:.85rem;">{{ b.placed_total }}</span></td>
+                                        {% endif %}
+                                        <td class="text-center"><span class="badge bg-danger">{{ b.unplaced }}</span></td>
+                                        <td class="text-center" style="min-width:130px;">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="progress flex-grow-1" style="height:6px;">
+                                                    <div class="progress-bar {% if ds.is_si %}bg-warning{% else %}bg-success{% endif %}"
+                                                         style="width:{{ b.placement_pct }}%;"></div>
+                                                </div>
+                                                <span class="small fw-semibold" style="min-width:36px;">{{ b.placement_pct }}%</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if b.avg_ctc %}<span class="fw-semibold text-success">₹{{ b.avg_ctc }} L</span>
+                                            {% else %}<span class="text-muted">—</span>{% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            {% if b.median_ctc %}<span class="fw-semibold text-primary">₹{{ b.median_ctc }} L</span>
+                                            {% else %}<span class="text-muted">—</span>{% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            {% if b.highest_ctc %}<span class="fw-semibold" style="color:#8e44ad;">₹{{ b.highest_ctc }} L</span>
+                                            {% else %}<span class="text-muted">—</span>{% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-dark">
+                                    <tr>
+                                        <td class="fw-bold">Overall Drive</td>
+                                        <td class="text-center fw-bold">{{ ds.total }}</td>
+                                        {% if ds.is_si %}
+                                            <td class="text-center fw-bold">{{ ds.si }}</td>
+                                        {% else %}
+                                            <td class="text-center fw-bold">{{ ds.placed }}</td>
+                                            <td class="text-center fw-bold">{{ ds.ppo }}</td>
+                                            <td class="text-center fw-bold">{{ ds.placed_total }}</td>
+                                        {% endif %}
+                                        <td class="text-center fw-bold">{{ ds.unplaced }}</td>
+                                        <td class="text-center fw-bold">{{ ds.overall_pct }}%</td>
+                                        <td class="text-center fw-bold">{% if ds.avg_ctc %}₹{{ ds.avg_ctc }} L{% else %}—{% endif %}</td>
+                                        <td class="text-center fw-bold">{% if ds.median_ctc %}₹{{ ds.median_ctc }} L{% else %}—{% endif %}</td>
+                                        <td class="text-center fw-bold">{% if ds.highest_ctc %}₹{{ ds.highest_ctc }} L{% else %}—{% endif %}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fa fa-info-circle me-1"></i>No branches assigned to this drive yet.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.drive-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.drive-pill').forEach(b => {
+            b.classList.remove('btn-primary');
+            b.classList.add('btn-outline-primary');
+        });
+        btn.classList.remove('btn-outline-primary');
+        btn.classList.add('btn-primary');
+        document.querySelectorAll('.drive-section').forEach(s => s.classList.add('d-none'));
+        document.getElementById(btn.dataset.target).classList.remove('d-none');
+    });
+});
+</script>
+{% endblock %}

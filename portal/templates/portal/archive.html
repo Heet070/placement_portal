@@ -1,0 +1,68 @@
+{% extends 'portal/base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="fw-bold text-muted mb-4"><i class="fa fa-box-archive me-2"></i>Archived Drives</h2>
+
+    <div class="row">
+        {% for drive in archived_drives %}
+        <div class="col-md-6 mb-4">
+            <div class="card bg-light shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="fw-bold text-secondary mb-1">{{ drive.drive_name }}</h5>
+                            <span class="badge bg-secondary">Year: {{ drive.drive_year }}</span>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                Actions
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <form method="POST" action="{% url 'restore_drive' drive.drive_id %}">
+                                        {% csrf_token %}
+                                        <button class="dropdown-item text-success" type="submit"><i class="fa fa-arrow-rotate-left me-2"></i>Restore Drive</button>
+                                    </form>
+                                </li>
+                                <li><a class="dropdown-item" href="{% url 'export_archive_csv' drive.drive_id %}"><i class="fa fa-download me-2"></i>Export Data</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="row text-center mt-4">
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-white">
+                                <h6 class="text-muted small mb-1">Students</h6>
+                                <span class="fw-bold">{{ drive.students.count }}</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-white">
+                                <h6 class="text-muted small mb-1">Companies</h6>
+                                <span class="fw-bold">{{ drive.companies.count }}</span>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 border rounded bg-white">
+                                <h6 class="text-muted small mb-1">Status</h6>
+                                <span class="badge bg-secondary">Archived</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center py-5">
+                    <i class="fa fa-box-open fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted mb-0">No archived drives found.</h5>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

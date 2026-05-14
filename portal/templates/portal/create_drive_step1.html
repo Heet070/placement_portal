@@ -1,0 +1,22 @@
+{% extends 'portal/base.html' %}
+
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <div class="card shadow-sm border-0 mt-5">
+        <div class="card-body p-5">
+            <h3 class="fw-bold text-navy mb-4">Create Drive - Step 1</h3>
+            <div class="progress mb-4" style="height: 5px;">
+                <div class="progress-bar" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <form method="POST">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div class="text-end mt-4">
+                    <a href="{% url 'drives' %}" class="btn btn-light me-2">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Next Step <i class="fa fa-arrow-right ms-2"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

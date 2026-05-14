@@ -1,0 +1,95 @@
+{% extends 'portal/base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4 fw-bold text-navy">Dashboard</h2>
+
+    {% for stat in drive_stats %}
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-header bg-navy text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">{{ stat.drive.drive_name }}</h4>
+            <span class="badge bg-light text-dark">Year: {{ stat.drive.drive_year }}</span>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4 mt-3">
+                <div class="col-md-4">
+                    <div class="card stat-card shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <h5 class="card-title text-muted">Total Students</h5>
+                            <h2 class="fw-bold">{{ stat.total_students }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <h5 class="card-title text-muted">Placed Students</h5>
+                            <h2 class="fw-bold text-success">{{ stat.placed_students }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card stat-card shadow-sm border-0 bg-light">
+                        <div class="card-body text-center">
+                            <h5 class="card-title text-muted">Companies</h5>
+                            <h2 class="fw-bold">{{ stat.total_companies }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0 mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title text-center">Placement Overview</h5>
+                            <div style="height: 300px;">
+                                <canvas id="overviewChart{{ stat.drive.drive_id }}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-body text-center py-5">
+            <p class="text-muted mb-0">No active drives found. Please create one in the Drives section.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        $.ajax({
+            url: "{% url 'analytics_data' %}",
+            method: "GET",
+            success: function(response) {
+                const overviewData = response.overview;
+                
+                // Loop through each drive's data in the response
+                for (const driveId in overviewData) {
+                    if (overviewData.hasOwnProperty(driveId)) {
+                        const canvas = document.getElementById('overviewChart' + driveId);
+                        if (canvas) {
+                            var ctx = canvas.getContext('2d');
+                            new Chart(ctx, {
+                                type: 'doughnut',
+                                data: overviewData[driveId],
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,264 @@
+{% extends 'portal/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1 fw-bold">Admin Management</h2>
+        <p class="text-muted mb-0">Manage portal admins and super admins</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAdminModal">
+        <i class="fa fa-user-plus me-2"></i>Add Admin
+    </button>
+</div>
+
+<!-- Stats cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="fs-1 fw-bold text-primary">{{ admins.count }}</div>
+            <div class="text-muted small">Total Admins</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="fs-1 fw-bold text-danger">{{ admins|length }}</div>
+            <div class="text-muted small">Super Admins</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="fs-1 fw-bold text-success">
+                {% with regular=0 %}
+                    {% for a in admins %}{% if a.role == 'admin' %}{{ forloop.counter }}{% endif %}{% endfor %}
+                {% endwith %}
+            </div>
+            <div class="text-muted small">Regular Admins</div>
+        </div>
+    </div>
+</div>
+
+<!-- Admins Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Created By</th>
+                        <th>Joined</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for admin in admins %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                     style="width:36px;height:36px;background:{% if admin.is_super_admin %}#e74c3c{% else %}#3498db{% endif %};">
+                                    {{ admin.user.first_name|first|upper|default:admin.user.username|first|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-semibold">
+                                        {{ admin.user.get_full_name|default:admin.user.username }}
+                                        {% if admin.user == current_user %}
+                                            <span class="badge bg-secondary ms-1">You</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><code>{{ admin.user.username }}</code></td>
+                        <td>{{ admin.user.email }}</td>
+                        <td>
+                            {% if admin.is_super_admin %}
+                                <span class="badge bg-danger">
+                                    <i class="fa fa-crown me-1"></i>Super Admin
+                                </span>
+                            {% else %}
+                                <span class="badge bg-primary">
+                                    <i class="fa fa-user me-1"></i>Admin
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if admin.created_by %}
+                                {{ admin.created_by.get_full_name|default:admin.created_by.username }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ admin.created_at|date:"d M Y" }}</td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1">
+                                <!-- Edit -->
+                                <button class="btn btn-sm btn-outline-primary" title="Edit"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#editAdminModal"
+                                    data-user-id="{{ admin.user.pk }}"
+                                    data-first-name="{{ admin.user.first_name }}"
+                                    data-last-name="{{ admin.user.last_name }}"
+                                    data-email="{{ admin.user.email }}"
+                                    data-username="{{ admin.user.username }}"
+                                    data-role="{{ admin.role }}">
+                                    <i class="fa fa-edit"></i>
+                                </button>
+                                <!-- Resend credentials -->
+                                <form method="post" action="{% url 'resend_credentials' admin.user.pk %}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Resend credentials to {{ admin.user.email }}? A new password will be generated.')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Resend Credentials">
+                                        <i class="fa fa-envelope"></i>
+                                    </button>
+                                </form>
+                                <!-- Delete -->
+                                {% if admin.user != current_user %}
+                                <form method="post" action="{% url 'delete_admin' admin.user.pk %}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Delete admin {{ admin.user.username }}? This cannot be undone.')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">No admins found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── CREATE ADMIN MODAL ── -->
+<div class="modal fade" id="createAdminModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'create_admin' %}">
+                {% csrf_token %}
+                <div class="modal-header" style="background:#fff;color:#000;border-bottom:1px solid #dee2e6;">
+                    <h5 class="modal-title"><i class="fa fa-user-plus me-2"></i>Add New Admin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2 small">
+                        <i class="fa fa-info-circle me-1"></i>
+                        A random password will be generated and emailed to the new admin.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">First Name</label>
+                            <input type="text" name="first_name" class="form-control" placeholder="First name">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" name="last_name" class="form-control" placeholder="Last name">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Username <span class="text-danger">*</span></label>
+                            <input type="text" name="username" class="form-control" placeholder="e.g. john_doe" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+                            <input type="email" name="email" class="form-control" placeholder="admin@example.com" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Role <span class="text-danger">*</span></label>
+                            <select name="role" class="form-select">
+                                <option value="admin">Admin</option>
+                                <option value="super_admin">Super Admin</option>
+                            </select>
+                            <div class="form-text">Super Admins can manage other admins.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa fa-user-plus me-1"></i>Create & Send Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ── EDIT ADMIN MODAL ── -->
+<div class="modal fade" id="editAdminModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" id="editAdminForm">
+                {% csrf_token %}
+                <div class="modal-header" style="background:#fff;color:#000;border-bottom:1px solid #dee2e6;">
+                    <h5 class="modal-title"><i class="fa fa-edit me-2"></i>Edit Admin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">First Name</label>
+                            <input type="text" name="first_name" id="edit_first_name" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" name="last_name" id="edit_last_name" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Username</label>
+                            <input type="text" id="edit_username" class="form-control" disabled>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+                            <input type="email" name="email" id="edit_email" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Role <span class="text-danger">*</span></label>
+                            <select name="role" id="edit_role" class="form-select">
+                                <option value="admin">Admin</option>
+                                <option value="super_admin">Super Admin</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">New Password <span class="text-muted small">(leave blank to keep current)</span></label>
+                            <input type="password" name="new_password" class="form-control"
+                                   placeholder="Min 8 characters">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa fa-save me-1"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('editAdminModal').addEventListener('show.bs.modal', function(event) {
+    const btn = event.relatedTarget;
+    const userId = btn.dataset.userId;
+    document.getElementById('editAdminForm').action = `/auth/edit-admin/${userId}/`;
+    document.getElementById('edit_first_name').value = btn.dataset.firstName || '';
+    document.getElementById('edit_last_name').value = btn.dataset.lastName || '';
+    document.getElementById('edit_username').value = btn.dataset.username || '';
+    document.getElementById('edit_email').value = btn.dataset.email || '';
+    document.getElementById('edit_role').value = btn.dataset.role || 'admin';
+});
+</script>
+{% endblock %}
