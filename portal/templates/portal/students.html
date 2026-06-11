@@ -83,6 +83,7 @@
                             <th>Company</th>
                             <th>CTC</th>
                             <th>Stipend</th>
+                            <th>Offer Letter</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -109,6 +110,15 @@
                             <td class="align-middle">{% if student.profile %}{{ student.profile.ctc }} LPA{% else %}-{% endif %}</td>
                             <td class="align-middle">{% if student.profile and student.profile.stipend %}{{ student.profile.stipend }}{% else %}-{% endif %}</td>
                             <td class="align-middle">
+                                {% if student.offer_letter %}
+                                    <a href="{{ student.offer_letter }}" target="_blank" class="text-truncate d-inline-block text-decoration-none" style="max-width: 150px;" title="{{ student.offer_letter }}">
+                                        <i class="fa fa-external-link-alt me-1"></i>Link
+                                    </a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
                                 <div class="btn-group btn-group-sm">
                                     <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStudentModal{{ student.student_id }}">
                                         <i class="fa fa-edit"></i>
@@ -121,7 +131,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="text-center py-4 text-muted">No students found.</td>
+                            <td colspan="11" class="text-center py-4 text-muted">No students found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -177,6 +187,7 @@
                         </div>
                         <div class="col-md-12 mb-3">{{ student_form.company.label_tag }} {{ student_form.company }}</div>
                         <div class="col-md-12 mb-3">{{ student_form.profile.label_tag }} {{ student_form.profile }}</div>
+                        <div class="col-md-12 mb-3">{{ student_form.offer_letter.label_tag }} {{ student_form.offer_letter }}</div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-0">
@@ -294,6 +305,10 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Offer Letter (Google Drive Link)</label>
+                            <input type="text" name="offer_letter" class="form-control" placeholder="Google Drive Link" value="{{ student.offer_letter|default:'' }}">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer bg-light border-0">
@@ -344,6 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const placementStatusSelect = container.querySelector('select[name="placement_status"]');
         const companySelect = container.querySelector('select[name="company"]');
         const profileSelect = container.querySelector('select[name="profile"]');
+        const offerLetterInput = container.querySelector('input[name="offer_letter"]');
         const driveSelect = container.querySelector('select[name="drive"]');
         
         if (!placementStatusSelect || !companySelect || !profileSelect) return;
@@ -427,6 +443,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 profileSelect.required = true;
                 companySelect.parentElement.style.display = 'block';
                 profileSelect.parentElement.style.display = 'block';
+                if (offerLetterInput) {
+                    offerLetterInput.parentElement.style.display = 'block';
+                }
                 // Fetch profiles on load if company is pre-selected, but avoid double fetches
                 if (isInitialLoad && companySelect.value) {
                     fetchProfiles(initialProfileId);
@@ -439,6 +458,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 companySelect.value = '';
                 profileSelect.value = '';
                 profileSelect.innerHTML = '<option value="">---------</option>';
+                if (offerLetterInput) {
+                    offerLetterInput.parentElement.style.display = 'none';
+                    offerLetterInput.value = '';
+                }
             }
             isInitialLoad = false;
         }

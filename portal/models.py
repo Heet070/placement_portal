@@ -78,6 +78,14 @@ class Drive(models.Model):
                 )
         super().save(*args, **kwargs)
 
+    @property
+    def is_si(self):
+        return self.drive_id and self.drive_id.startswith('SI')
+
+    @property
+    def is_pd(self):
+        return self.drive_id and self.drive_id.startswith('PD')
+
 
 class Student(models.Model):
     PLACEMENT_STATUS_CHOICES = [
@@ -98,6 +106,7 @@ class Student(models.Model):
     profile = models.ForeignKey(
         'Profile', on_delete=models.SET_NULL, null=True, blank=True, related_name='students'
     )
+    offer_letter = models.CharField(max_length=1000, blank=True, null=True)
 
     # Custom managers
     objects = ActiveDriveManager()  # Default — active drives only
@@ -125,6 +134,8 @@ class Student(models.Model):
                     f'PD drives only allow "Unplaced", "Placed", or "PPO" status. '
                     f'Got "{status}".'
                 )
+        if self.placement_status == 'Unplaced' and self.offer_letter:
+            raise ValidationError('Offer letter link cannot be set for Unplaced students.')
 
 
 class Company(models.Model):
@@ -164,6 +175,7 @@ class Profile(models.Model):
     ctc = models.DecimalField(max_digits=10, decimal_places=2)
     stipend = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     offer_type = models.CharField(max_length=10, choices=OFFER_TYPE_CHOICES, null=True, blank=True)
+    branches = models.ManyToManyField(Branch, related_name='profiles', blank=True)
 
     class Meta:
         db_table = 'profile'
@@ -171,6 +183,25 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.profile_name} @ {self.cmp.cmp_name}"
+
+    def clean(self):
+        super().clean()
+        if self.cmp_id and self.offer_type:
+            drive_id = str(self.cmp.drive_id)
+            if drive_id.startswith('SI') and self.offer_type != 'SI':
+                raise ValidationError(
+                    f'Summer Internship drives (SI) only allow the "Summer Internship" (SI) offer type. '
+                    f'Got "{self.get_offer_type_display()}".'
+                )
+            if drive_id.startswith('PD') and self.offer_type == 'SI':
+                raise ValidationError(
+                    f'Placement drives (PD) do not allow the "Summer Internship" (SI) offer type. '
+                    f'Got "{self.get_offer_type_display()}".'
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class AdminProfile(models.Model):

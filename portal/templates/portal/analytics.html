@@ -246,6 +246,82 @@
                     </div>
                 </div>
 
+                <!-- Branch-wise Profile Openings -->
+                <div class="card border-0 shadow-sm mb-5">
+                    <div class="card-header bg-white border-bottom d-flex align-items-center gap-2 py-3">
+                        <i class="fa fa-briefcase text-success"></i>
+                        <h6 class="mb-0 fw-bold">Branch-wise Profile Openings</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if ds.branches %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Branch</th>
+                                        <th class="text-center">Profiles Opened</th>
+                                        <th>Eligible Company Profiles</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for b in ds.branches %}
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">{{ b.branch_name }}</div>
+                                            <div class="text-muted" style="font-size:.72rem;">{{ b.branch_id }}</div>
+                                        </td>
+                                        <td class="text-center fw-bold fs-5 text-success">
+                                            {{ b.opened_profiles }}
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-1 align-items-center">
+                                                {% for p in b.opened_profiles_list %}
+                                                    {% if forloop.counter <= 5 %}
+                                                        <span class="badge bg-light text-dark border" title="CTC/Stipend: {% if p.ctc %}{{ p.ctc }} LPA{% else %}{{ p.stipend }}{% endif %}">
+                                                            {{ p.cmp.cmp_name }} - {{ p.profile_name }}
+                                                        </span>
+                                                    {% endif %}
+                                                {% empty %}
+                                                    <span class="text-muted small">None</span>
+                                                {% endfor %}
+                                                
+                                                {% if b.opened_profiles > 5 %}
+                                                    <button class="btn btn-sm btn-outline-secondary py-0 px-2 rounded-pill small" 
+                                                            type="button" 
+                                                            data-bs-toggle="collapse" 
+                                                            data-bs-target="#more_profiles_{{ ds.drive.drive_id }}_{{ b.branch_id }}" 
+                                                            aria-expanded="false"
+                                                            style="font-size: 0.75rem;">
+                                                        +{{ b.opened_profiles|add:"-5" }} more
+                                                    </button>
+                                                    
+                                                    <div class="collapse w-100 mt-2" id="more_profiles_{{ ds.drive.drive_id }}_{{ b.branch_id }}">
+                                                        <div class="d-flex flex-wrap gap-1 p-2 border rounded bg-white" style="max-height: 150px; overflow-y: auto;">
+                                                            {% for p in b.opened_profiles_list %}
+                                                                {% if forloop.counter > 5 %}
+                                                                    <span class="badge bg-light text-dark border" title="CTC/Stipend: {% if p.ctc %}{{ p.ctc }} LPA{% else %}{{ p.stipend }}{% endif %}">
+                                                                        {{ p.cmp.cmp_name }} - {{ p.profile_name }}
+                                                                    </span>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fa fa-info-circle me-1"></i>No branches assigned to this drive yet.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
             </div>
             {% endfor %}
         </div>

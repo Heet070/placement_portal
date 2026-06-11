@@ -149,7 +149,7 @@ def export_drive_data(request, drive_id):
     # 1. Create Students CSV
     student_output = io.StringIO()
     student_writer = csv.writer(student_output)
-    student_writer.writerow(['ID', 'Name', 'Branch', 'CPI', 'Placement Status', 'Company', 'Profile', 'CTC', 'Stipend'])
+    student_writer.writerow(['ID', 'Name', 'Branch', 'CPI', 'Placement Status', 'Company', 'Profile Name', 'CTC (LPA)', 'Stipend', 'Offer Letter'])
     
     students = Student.all_objects.filter(drive=drive)
     for std in students:
@@ -159,23 +159,25 @@ def export_drive_data(request, drive_id):
             std.company.cmp_name if std.company else '', 
             std.profile.profile_name if std.profile else '',
             std.profile.ctc if std.profile else '',
-            std.profile.stipend if std.profile else ''
+            std.profile.stipend if std.profile else '',
+            std.offer_letter or ''
         ])
     
     # 2. Create Companies CSV
     company_output = io.StringIO()
     company_writer = csv.writer(company_output)
-    company_writer.writerow(['Company Name', 'Profile Name', 'CTC (LPA)', 'Stipend'])
+    company_writer.writerow(['Company Name', 'Profile Name', 'CTC (LPA)', 'Stipend', 'Eligible Branches'])
     
-    companies = Company.all_objects.filter(drive=drive).prefetch_related('profiles')
+    companies = Company.all_objects.filter(drive=drive).prefetch_related('profiles__branches')
     for cmp in companies:
         if cmp.profiles.exists():
             for profile in cmp.profiles.all():
+                branches_str = ", ".join([b.branch_id for b in profile.branches.all()])
                 company_writer.writerow([
-                    cmp.cmp_name, profile.profile_name, profile.ctc, profile.stipend or ''
+                    cmp.cmp_name, profile.profile_name, profile.ctc, profile.stipend or '', branches_str
                 ])
         else:
-            company_writer.writerow([cmp.cmp_name, '', '', ''])
+            company_writer.writerow([cmp.cmp_name, '', '', '', ''])
 
     # 3. Create ZIP
     zip_buffer = io.BytesIO()
@@ -352,7 +354,8 @@ def bulk_upload_students(request):
                                 branch=branch,
                                 drive=drive,
                                 cpi=row['cpi'],
-                                placement_status=placement_status
+                                placement_status=placement_status,
+                                offer_letter=row.get('offer_letter', '')
                             )
                             student.full_clean()
                             student.save()
@@ -373,9 +376,9 @@ def download_csv_template(request):
     response['Content-Disposition'] = 'attachment; filename="student_upload_template.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(['student_id', 'std_name', 'branch_id', 'drive_id', 'cpi', 'placement_status'])
-    writer.writerow(['STU001', 'John Doe', 'BTECH_CSE', 'SI2025', '8.5', 'Unplaced'])
-    writer.writerow(['STU002', 'Jane Smith', 'BTECH_EE', 'PD2025', '9.1', 'Placed'])
+    writer.writerow(['student_id', 'std_name', 'branch_id', 'drive_id', 'cpi', 'placement_status', 'offer_letter'])
+    writer.writerow(['STU001', 'John Doe', 'BTECH_CSE', 'SI2025', '8.5', 'Unplaced', ''])
+    writer.writerow(['STU002', 'Jane Smith', 'BTECH_EE', 'PD2025', '9.1', 'Placed', 'https://drive.google.com/file/d/example'])
 
     return response
 
@@ -409,15 +412,17 @@ def export_students_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="students.csv"'
     writer = csv.writer(response)
-    writer.writerow(['ID', 'Name', 'Branch', 'Drive', 'CPI', 'Placement Status', 'Company', 'CTC', 'Stipend'])
+    writer.writerow(['ID', 'Name', 'Branch', 'Drive', 'CPI', 'Placement Status', 'Company', 'Profile Name', 'CTC (LPA)', 'Stipend', 'Offer Letter'])
     
     for std in Student.objects.all():
         writer.writerow([
             std.student_id, std.std_name, std.branch.branch_name, 
             std.drive.drive_name, std.cpi, std.placement_status, 
             std.company.cmp_name if std.company else '', 
+            std.profile.profile_name if std.profile else '',
             std.profile.ctc if std.profile else '',
-            std.profile.stipend if std.profile else ''
+            std.profile.stipend if std.profile else '',
+            std.offer_letter or ''
         ])
     return response
 
@@ -428,6 +433,7 @@ def companies_list(request):
     context = {
         'companies': companies,
         'drives': Drive.objects.filter(status='active'),
+        'branches': Branch.objects.all(),
         'company_form': CompanyForm(),
         'profile_form': ProfileForm()
     }
@@ -474,7 +480,12 @@ def add_profile(request):
             profile = form.save(commit=False)
             profile.cmp = cmp
             profile.save()
+            form.save_m2m()
             messages.success(request, 'Profile added successfully.')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field.replace('_', ' ').title()}: {error}")
     return redirect('companies')
 
 
@@ -486,6 +497,10 @@ def edit_profile(request, profile_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Profile updated successfully.')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field.replace('_', ' ').title()}: {error}")
     return redirect('companies')
 
 
@@ -559,6 +574,8 @@ def analytics(request):
                 'primary_count': b_primary,
                 'avg_ctc': b_avg, 'median_ctc': b_median, 'highest_ctc': b_highest,
                 'placement_pct': b_pct,
+                'opened_profiles': Profile.objects.filter(cmp__drive=drive, branches=branch).count(),
+                'opened_profiles_list': Profile.objects.filter(cmp__drive=drive, branches=branch).select_related('cmp'),
             })
 
         drive_stats.append({
@@ -600,7 +617,7 @@ def export_archive_csv(request, drive_id):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="archive_{drive.drive_name}.csv"'
     writer = csv.writer(response)
-    writer.writerow(['ID', 'Name', 'Branch', 'CPI', 'Placement Status', 'Company', 'CTC', 'Stipend'])
+    writer.writerow(['ID', 'Name', 'Branch', 'CPI', 'Placement Status', 'Company', 'Profile Name', 'CTC (LPA)', 'Stipend', 'Offer Letter'])
     
     # Bypass ActiveDriveManager for archive export
     students = Student.all_objects.filter(drive=drive)
@@ -609,8 +626,10 @@ def export_archive_csv(request, drive_id):
             std.student_id, std.std_name, std.branch.branch_name, 
             std.cpi, std.placement_status, 
             std.company.cmp_name if std.company else '', 
+            std.profile.profile_name if std.profile else '',
             std.profile.ctc if std.profile else '',
-            std.profile.stipend if std.profile else ''
+            std.profile.stipend if std.profile else '',
+            std.offer_letter or ''
         ])
     return response
 

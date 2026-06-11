@@ -52,7 +52,7 @@ class StudentForm(forms.ModelForm):
 
     class Meta:
         model = Student
-        fields = ['student_id', 'std_name', 'branch', 'drive', 'cpi', 'placement_status', 'switch_app', 'company', 'profile']
+        fields = ['student_id', 'std_name', 'branch', 'drive', 'cpi', 'placement_status', 'switch_app', 'company', 'profile', 'offer_letter']
         widgets = {
             'student_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Student ID'}),
             'std_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Student Name'}),
@@ -63,6 +63,7 @@ class StudentForm(forms.ModelForm):
             'switch_app': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'company': forms.Select(attrs={'class': 'form-control'}),
             'profile': forms.Select(attrs={'class': 'form-control'}),
+            'offer_letter': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Google Drive Link'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -72,6 +73,7 @@ class StudentForm(forms.ModelForm):
         # Profile and company are optional initially, validated in clean
         self.fields['profile'].required = False
         self.fields['company'].required = False
+        self.fields['offer_letter'].required = False
         # Filter profiles to active drive companies
         self.fields['profile'].queryset = Profile.objects.filter(cmp__drive__status='active')
         self.fields['company'].queryset = Company.objects.filter(drive__status='active')
@@ -81,6 +83,7 @@ class StudentForm(forms.ModelForm):
         placement_status = cleaned_data.get('placement_status')
         company = cleaned_data.get('company')
         profile = cleaned_data.get('profile')
+        offer_letter = cleaned_data.get('offer_letter')
         drive = cleaned_data.get('drive')
 
         # Drive-type restrictions
@@ -102,6 +105,7 @@ class StudentForm(forms.ModelForm):
         else:
             cleaned_data['company'] = None
             cleaned_data['profile'] = None
+            cleaned_data['offer_letter'] = ''
 
         return cleaned_data
 
@@ -124,16 +128,45 @@ class CompanyForm(forms.ModelForm):
 
 class ProfileForm(forms.ModelForm):
     """Form for adding a profile to a company."""
+    branches = forms.ModelMultipleChoiceField(
+        queryset=Branch.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        required=False
+    )
 
     class Meta:
         model = Profile
-        fields = ['profile_name', 'ctc', 'stipend', 'offer_type']
+        fields = ['profile_name', 'ctc', 'stipend', 'offer_type', 'branches']
         widgets = {
             'profile_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Profile Name'}),
             'ctc': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'CTC in LPA'}),
             'stipend': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Stipend amount'}),
             'offer_type': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        offer_type = cleaned_data.get('offer_type')
+        
+        cmp = None
+        if self.instance and hasattr(self.instance, 'cmp') and self.instance.cmp:
+            cmp = self.instance.cmp
+        else:
+            cmp_id = self.data.get('cmp_id')
+            if cmp_id:
+                try:
+                    cmp = Company.objects.get(pk=cmp_id)
+                except Company.DoesNotExist:
+                    pass
+        
+        if cmp and offer_type:
+            drive_id = str(cmp.drive_id)
+            if drive_id.startswith('SI') and offer_type != 'SI':
+                self.add_error('offer_type', 'Summer Internship drives (SI) only allow the "Summer Internship" (SI) offer type.')
+            if drive_id.startswith('PD') and offer_type == 'SI':
+                self.add_error('offer_type', 'Placement drives (PD) do not allow the "Summer Internship" (SI) offer type.')
+                
+        return cleaned_data
 
 
 class CSVUploadForm(forms.Form):
