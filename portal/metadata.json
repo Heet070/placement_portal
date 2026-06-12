@@ -1,0 +1,244 @@
+{
+    "branch": {
+        "model_class": "Branch",
+        "verbose_name": "branch",
+        "description": "Branch(branch_id, branch_name)",
+        "fields": {
+            "branch_id": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "branch_name": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            }
+        }
+    },
+    "drive": {
+        "model_class": "Drive",
+        "verbose_name": "drive",
+        "description": "Drive(drive_id, drive_name, drive_year, status)",
+        "fields": {
+            "drive_id": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "drive_name": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "drive_year": {
+                "type": "IntegerField",
+                "nullable": false,
+                "blank": false
+            },
+            "status": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false,
+                "choices": {
+                    "active": "Active",
+                    "inactive": "Inactive"
+                }
+            },
+            "branches": {
+                "type": "ManyToManyField",
+                "nullable": false,
+                "blank": true,
+                "related_table": "branch"
+            }
+        }
+    },
+    "student": {
+        "model_class": "Student",
+        "verbose_name": "student",
+        "description": "Student(student_id, std_name, branch, drive, cpi, placement_status, switch_app, company, profile, offer_letter)",
+        "fields": {
+            "student_id": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "std_name": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "branch": {
+                "type": "ForeignKey",
+                "nullable": false,
+                "blank": false,
+                "related_table": "branch"
+            },
+            "drive": {
+                "type": "ForeignKey",
+                "nullable": false,
+                "blank": false,
+                "related_table": "drive"
+            },
+            "cpi": {
+                "type": "DecimalField",
+                "nullable": false,
+                "blank": false
+            },
+            "placement_status": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false,
+                "choices": {
+                    "Unplaced": "Unplaced",
+                    "Placed": "Placed",
+                    "PPO": "PPO",
+                    "Summer Internship": "Summer Internship"
+                }
+            },
+            "switch_app": {
+                "type": "BooleanField",
+                "nullable": false,
+                "blank": false
+            },
+            "company": {
+                "type": "ForeignKey",
+                "nullable": true,
+                "blank": true,
+                "related_table": "company"
+            },
+            "profile": {
+                "type": "ForeignKey",
+                "nullable": true,
+                "blank": true,
+                "related_table": "profile"
+            },
+            "offer_letter": {
+                "type": "CharField",
+                "nullable": true,
+                "blank": true
+            }
+        }
+    },
+    "company": {
+        "model_class": "Company",
+        "verbose_name": "company",
+        "description": "Company(cmp_id, cmp_name, drive)",
+        "fields": {
+            "cmp_id": {
+                "type": "AutoField",
+                "nullable": false,
+                "blank": true
+            },
+            "cmp_name": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "drive": {
+                "type": "ForeignKey",
+                "nullable": false,
+                "blank": false,
+                "related_table": "drive"
+            }
+        }
+    },
+    "profile": {
+        "model_class": "Profile",
+        "verbose_name": "profile",
+        "description": "Profile(profile_id, cmp, profile_name, ctc, stipend, offer_type)",
+        "fields": {
+            "profile_id": {
+                "type": "AutoField",
+                "nullable": false,
+                "blank": true
+            },
+            "cmp": {
+                "type": "ForeignKey",
+                "nullable": false,
+                "blank": false,
+                "related_table": "company"
+            },
+            "profile_name": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "ctc": {
+                "type": "DecimalField",
+                "nullable": false,
+                "blank": false
+            },
+            "stipend": {
+                "type": "DecimalField",
+                "nullable": true,
+                "blank": true
+            },
+            "offer_type": {
+                "type": "CharField",
+                "nullable": true,
+                "blank": true,
+                "choices": {
+                    "WI": "Winter Internship",
+                    "WI+J": "Winter Internship + Job",
+                    "J": "Job",
+                    "SI": "Summer Internship"
+                }
+            },
+            "branches": {
+                "type": "ManyToManyField",
+                "nullable": false,
+                "blank": true,
+                "related_table": "branch"
+            }
+        }
+    },
+    "admin_profile": {
+        "model_class": "AdminProfile",
+        "verbose_name": "admin profile",
+        "description": "AdminProfile(id, user, role, created_by, created_at, reset_token, reset_token_expires)",
+        "fields": {
+            "id": {
+                "type": "BigAutoField",
+                "nullable": false,
+                "blank": true
+            },
+            "user": {
+                "type": "OneToOneField",
+                "nullable": false,
+                "blank": false,
+                "related_table": "auth_user"
+            },
+            "role": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false,
+                "choices": {
+                    "admin": "Admin",
+                    "super_admin": "Super Admin"
+                }
+            },
+            "created_by": {
+                "type": "ForeignKey",
+                "nullable": true,
+                "blank": true,
+                "related_table": "auth_user"
+            },
+            "created_at": {
+                "type": "DateTimeField",
+                "nullable": false,
+                "blank": true
+            },
+            "reset_token": {
+                "type": "CharField",
+                "nullable": true,
+                "blank": true
+            },
+            "reset_token_expires": {
+                "type": "DateTimeField",
+                "nullable": true,
+                "blank": true
+            }
+        }
+    }
+}

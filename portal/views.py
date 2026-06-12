@@ -721,3 +721,37 @@ def get_profiles_for_drive(request, drive_id):
 def get_profiles_for_company(request, cmp_id):
     profiles = Profile.objects.filter(cmp_id=cmp_id)
     return JsonResponse({'profiles': list(profiles.values('profile_id', 'profile_name', 'ctc', 'stipend'))})
+
+
+@login_required
+@csrf_exempt
+def text_to_sql_report(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_prompt = data.get('prompt')
+            
+            if not user_prompt:
+                return JsonResponse({"error": "No prompt provided"}, status=400)
+
+            # Local import to prevent circular dependencies
+            from .services import generate_excel_from_prompt
+            excel_file = generate_excel_from_prompt(user_prompt)
+            
+            response = HttpResponse(
+                excel_file.getvalue(), 
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="Placement_Report.xlsx"'
+            return response
+
+        except ValueError as ve:
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({"error": str(ve)}, status=400)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
+            
+    return JsonResponse({"error": "Only POST requests are allowed"}, status=405)

@@ -66,4 +66,5 @@ urlpatterns = [
     path('api/analytics-data/', views.analytics_data, name='analytics_data'),
     path('api/profiles/<str:drive_id>/', views.get_profiles_for_drive, name='get_profiles_for_drive'),
     path('api/profiles/company/<int:cmp_id>/', views.get_profiles_for_company, name='get_profiles_for_company'),
+    path('generate-report/', views.text_to_sql_report, name='generate_report'),
 ]

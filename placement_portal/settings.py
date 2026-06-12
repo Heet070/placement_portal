@@ -9,6 +9,14 @@ import dj_database_url
 
 load_dotenv()
 
+# If DATABASE_URL is not a valid DB scheme (e.g. Railway template placeholder like "${{Postgres.DATABASE_URL}}"
+# which python-dotenv expands to "}"), remove it to fallback to SQLite locally.
+database_url = os.environ.get('DATABASE_URL')
+valid_schemes = ('postgres://', 'postgresql://', 'sqlite://', 'mysql://', 'oracle://', 'mssql://')
+if database_url and not any(database_url.startswith(scheme) for scheme in valid_schemes):
+    os.environ.pop('DATABASE_URL', None)
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # -------------------------------------------------------------------
@@ -33,8 +41,8 @@ CSRF_TRUSTED_ORIGINS = [
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
 
 CSRF_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SAMESITE = "Lax"
@@ -104,6 +112,17 @@ DATABASES = {
         conn_max_age=600
     )
 }
+
+# Configure readonly database connection.
+# In production, this can route to a separate read-only follower via READONLY_DATABASE_URL.
+# In local development, we fallback to copying the default database settings (SQLite).
+readonly_url = os.environ.get('READONLY_DATABASE_URL')
+if readonly_url and not ('${{' in readonly_url or readonly_url.startswith('$')):
+    DATABASES['readonly'] = dj_database_url.parse(readonly_url)
+else:
+    import copy
+    DATABASES['readonly'] = copy.deepcopy(DATABASES['default'])
+
 
 # -------------------------------------------------------------------
 # SESSION CONFIG

@@ -218,3 +218,21 @@ class ProfileOfferTypeValidationTests(TestCase):
         profile_valid.full_clean()  # Should not raise any error
 
 
+class TextToSQLTests(TestCase):
+    def test_safe_query_validation(self):
+        from portal.services import is_safe_query
+        self.assertTrue(is_safe_query("SELECT * FROM student"))
+        self.assertTrue(is_safe_query("SELECT std_name, cpi FROM student WHERE cpi > 8.0"))
+        
+        self.assertFalse(is_safe_query("INSERT INTO student (student_id) VALUES ('1')"))
+        self.assertFalse(is_safe_query("UPDATE student SET cpi = 10.0"))
+        self.assertFalse(is_safe_query("DELETE FROM student"))
+        self.assertFalse(is_safe_query("DROP TABLE student"))
+
+    def test_endpoint_requires_login(self):
+        response = self.client.post('/generate-report/', {'prompt': 'Show students'}, content_type='application/json')
+        # Should redirect to login page (302 status code)
+        self.assertEqual(response.status_code, 302)
+
+
+

@@ -4,6 +4,84 @@
 <div class="container-fluid">
     <h2 class="mb-4 fw-bold text-navy">Dashboard</h2>
 
+    <style>
+        #reportPrompt::placeholder {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+        #reportPrompt:focus {
+            background-color: rgba(255, 255, 255, 0.18) !important;
+            color: white !important;
+            box-shadow: 0 0 0 3px rgba(13, 202, 240, 0.25) !important;
+        }
+    </style>
+
+    <!-- AI Excel Report Generator UI -->
+    <div class="card border-0 shadow-sm mb-5 position-relative overflow-hidden" 
+         style="background: linear-gradient(135deg, #0B1E36 0%, #1A3557 100%); border-radius: 16px;">
+        <div class="position-absolute top-0 end-0 p-3 opacity-10">
+            <i class="fa fa-wand-magic-sparkles text-white" style="font-size: 8rem; transform: rotate(15deg);"></i>
+        </div>
+        <div class="card-body p-4 p-md-5 text-white position-relative z-index-1">
+            <div class="d-flex align-items-center mb-3">
+                <div class="bg-white bg-opacity-10 rounded-3 p-2 me-3 d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                    <i class="fa fa-robot fs-4 text-info"></i>
+                </div>
+                <div>
+                    <span class="badge text-uppercase px-2 py-1 fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.08em; background-color: rgba(255, 255, 255, 0.15);">AI Powered</span>
+                    <h4 class="mb-0 fw-bold">AI Excel Report Generator</h4>
+                </div>
+            </div>
+            
+            <p class="text-white text-opacity-75 mb-4" style="max-width: 600px;">
+                Ask any question about your drives, students, companies, or CTC details, and the AI will build and download a customized Excel report for you instantly.
+            </p>
+
+            <div class="row g-2 align-items-center">
+                <div class="col-md-9 col-lg-10">
+                    <div class="position-relative">
+                        <i class="fa fa-quote-left position-absolute top-50 start-0 translate-middle-y text-white text-opacity-25 ms-3 fs-5"></i>
+                        <input type="text" id="reportPrompt" 
+                               class="form-control form-control-lg border-0 shadow-none ps-5 text-white" 
+                               style="border-radius: 12px; height: 52px; font-size: 0.95rem; background-color: rgba(255, 255, 255, 0.1) !important; color: white !important;"
+                               placeholder="e.g., Show me all ICT students placed in Google with a package above 15 LPA...">
+                    </div>
+                </div>
+                <div class="col-md-3 col-lg-2">
+                    <button id="generateBtn" onclick="downloadReport()" class="btn btn-info btn-lg w-100 fw-semibold text-navy d-flex align-items-center justify-content-center" 
+                            style="border-radius: 12px; height: 52px; transition: all 0.3s ease;">
+                        <i class="fa fa-wand-magic-sparkles me-2"></i> Generate
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Suggestions -->
+            <div class="mt-3">
+                <span class="text-white text-opacity-50 small me-2">Try asking:</span>
+                <div class="d-inline-flex flex-wrap gap-2 mt-1 mt-md-0">
+                    <button class="btn btn-sm btn-outline-light border-0 bg-white bg-opacity-10 text-white rounded-pill px-3 py-1 text-opacity-90" 
+                            style="font-size: 0.8rem; transition: all 0.2s;"
+                            onclick="fillPrompt('Show all students placed in Google')">
+                        "Placed in Google"
+                    </button>
+                    <button class="btn btn-sm btn-outline-light border-0 bg-white bg-opacity-10 text-white rounded-pill px-3 py-1 text-opacity-90" 
+                            style="font-size: 0.8rem; transition: all 0.2s;"
+                            onclick="fillPrompt('List average CPI of placed students by branch')">
+                        "Average CPI by branch"
+                    </button>
+                    <button class="btn btn-sm btn-outline-light border-0 bg-white bg-opacity-10 text-white rounded-pill px-3 py-1 text-opacity-90" 
+                            style="font-size: 0.8rem; transition: all 0.2s;"
+                            onclick="fillPrompt('Show companies and their profile CTCs')">
+                        "CTC by company"
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error/Success Alert Box -->
+            <div id="ai-report-alert" class="mt-3 d-none"></div>
+        </div>
+    </div>
+
+
     {% for stat in drive_stats %}
     <div class="card shadow-sm border-0 mb-5">
         <div class="card-header bg-navy text-white d-flex justify-content-between align-items-center">
@@ -90,6 +168,122 @@
                 }
             }
         });
+
+        // Allow pressing Enter key to generate the report
+        $('#reportPrompt').on('keypress', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                downloadReport();
+            }
+        });
     });
+
+    function fillPrompt(text) {
+        document.getElementById('reportPrompt').value = text;
+        const alertBox = document.getElementById('ai-report-alert');
+        alertBox.classList.add('d-none');
+    }
+
+    async function downloadReport() {
+        const promptInput = document.getElementById('reportPrompt');
+        const generateBtn = document.getElementById('generateBtn');
+        const alertBox = document.getElementById('ai-report-alert');
+        const prompt = promptInput.value.trim();
+        
+        // Hide any previous alert and reset inline styles
+        alertBox.classList.add('d-none');
+        alertBox.style.cssText = "";
+        
+        if (!prompt) {
+            alertBox.className = "alert alert-warning alert-dismissible fade show mt-3 border-0 shadow-sm";
+            alertBox.innerHTML = `
+                <strong><i class="fa fa-triangle-exclamation me-2"></i>Warning:</strong> Please enter a prompt first!
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertBox.classList.remove('d-none');
+            return;
+        }
+
+        // Set loading state
+        const originalBtnHTML = generateBtn.innerHTML;
+        generateBtn.disabled = true;
+        promptInput.disabled = true;
+        generateBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Generating...`;
+
+        try {
+            const response = await fetch('/generate-report/', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ prompt: prompt })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'Placement_Report.xlsx';
+                document.body.appendChild(a);
+                
+                // Trigger the download asynchronously to avoid page execution lock
+                setTimeout(() => {
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                // Show success alert in a solid high-visibility emerald green theme
+                alertBox.className = "alert alert-dismissible fade show mt-3 border-0 shadow-sm text-white";
+                alertBox.style.cssText = "background: linear-gradient(90deg, #198754 0%, #1ea062 100%) !important; color: #ffffff !important; border-radius: 12px; padding: 15px 4rem 15px 1.25rem !important;";
+                alertBox.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fa fa-circle-check fs-5 me-2" style="color: #ffffff !important;"></i>
+                        <span style="color: #ffffff !important;"><strong style="color: #ffffff !important;">Success:</strong> Your Excel report has been generated and downloaded successfully.</span>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" style="opacity: 0.9;"></button>
+                `;
+                alertBox.classList.remove('d-none');
+            } else {
+                let errorMessage = "An error occurred on the server.";
+                try {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } else {
+                        const errorText = await response.text();
+                        errorMessage = errorText || errorMessage;
+                    }
+                } catch (e) {
+                    console.error("Error reading failure response", e);
+                }
+
+                alertBox.style.cssText = "";
+                alertBox.className = "alert alert-danger alert-dismissible fade show mt-3 border-0 shadow-sm";
+                alertBox.innerHTML = `
+                    <strong><i class="fa fa-circle-exclamation me-2"></i>Error:</strong> ${errorMessage}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                alertBox.classList.remove('d-none');
+            }
+        } catch (error) {
+            alertBox.style.cssText = "";
+            alertBox.className = "alert alert-danger alert-dismissible fade show mt-3 border-0 shadow-sm";
+            alertBox.innerHTML = `
+                <strong><i class="fa fa-circle-exclamation me-2"></i>Error:</strong> Something went wrong connecting to the server. Please try again.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertBox.classList.remove('d-none');
+        } finally {
+            // Restore elements
+            generateBtn.disabled = false;
+            promptInput.disabled = false;
+            generateBtn.innerHTML = originalBtnHTML;
+        }
+    }
 </script>
 {% endblock %}
