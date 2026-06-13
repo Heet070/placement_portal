@@ -111,10 +111,6 @@ def generate_excel_from_prompt(user_prompt):
     )
     
     raw_sql = response.text.strip().replace('```sql', '').replace('```', '')
-    print("--- GENERATED SQL ---")
-    print(raw_sql)
-    print("---------------------")
-    
     if not is_safe_query(raw_sql):
         raise ValueError("Unsafe SQL query generated.")
 
