@@ -52,6 +52,24 @@ urlpatterns = [
     path('profiles/add/', views.add_profile, name='add_profile'),
     path('profiles/edit/<int:profile_id>/', views.edit_profile, name='edit_profile'),
     path('profiles/delete/<int:profile_id>/', views.delete_profile, name='delete_profile'),
+    path('profiles/<int:profile_id>/rounds/', views.profile_rounds, name='profile_rounds'),
+    path('profiles/<int:profile_id>/rounds/add/', views.add_round, name='add_round'),
+    path('profiles/<int:profile_id>/rounds/reorder/', views.reorder_rounds, name='reorder_rounds'),
+    path('profiles/<int:profile_id>/export-journey/', views.export_profile_journey_excel, name='export_profile_journey_excel'),
+    path('rounds/<int:round_id>/edit/', views.edit_round, name='edit_round'),
+    path('rounds/<int:round_id>/delete/', views.delete_round, name='delete_round'),
+    path('rounds/<int:round_id>/upload-csv/', views.upload_round_students_csv, name='upload_round_students_csv'),
+    path('rounds/<int:round_id>/add-student/', views.add_round_student, name='add_round_student'),
+    path('rounds/<int:round_id>/remove-student/<str:student_id>/', views.remove_round_student, name='remove_round_student'),
+    path('rounds/<int:round_id>/toggle-final/', views.toggle_round_final, name='toggle_round_final'),
+    path('rounds/<int:round_id>/export/', views.export_round_students, name='export_round_students'),
+    path('rounds/<int:round_id>/toggle-interview-shortlist/', views.toggle_interview_shortlist, name='toggle_interview_shortlist'),
+    path('rounds/<int:round_id>/csv-template/', views.download_round_csv_template, name='download_round_csv_template'),
+
+    # Student Detail
+    path('students/<str:student_id>/detail/', views.student_detail, name='student_detail'),
+    path('students/<str:student_id>/detail/export/', views.export_student_detail, name='export_student_detail'),
+
 
     # Analytics
     path('analytics/', views.analytics, name='analytics'),

@@ -145,6 +145,7 @@
                                     <th>Stipend</th>
                                     <th>Offer Type</th>
                                     <th>Eligible Branches</th>
+                                    <th>Rounds</th>
                                     <th>Selects</th>
                                     <th>Actions</th>
                                 </tr>
@@ -157,7 +158,9 @@
                                 <tr>
 
                                     <td class="align-middle">
-                                        {{ profile.profile_name }}
+                                        <a href="{% url 'profile_rounds' profile.profile_id %}" class="fw-bold text-decoration-none text-navy">
+                                            {{ profile.profile_name }}
+                                        </a>
                                     </td>
 
                                     <td class="align-middle">
@@ -185,6 +188,12 @@
                                     </td>
 
                                     <td class="align-middle">
+                                        <a href="{% url 'profile_rounds' profile.profile_id %}" class="badge bg-secondary text-decoration-none">
+                                            <i class="fa-solid fa-route me-1"></i>{{ profile.rounds.count }}
+                                        </a>
+                                    </td>
+
+                                    <td class="align-middle">
 
                                         <a href="{% url 'students' %}?profile={{ profile.profile_id }}"
                                            class="badge bg-info text-decoration-none">
@@ -195,9 +204,15 @@
 
                                     </td>
 
-                                    <td class="align-middle" style="width: 120px;">
+                                    <td class="align-middle" style="width: 150px;">
 
                                         <div class="d-flex gap-2">
+
+                                            <a href="{% url 'export_profile_journey_excel' profile.profile_id %}"
+                                               class="btn btn-sm btn-success"
+                                               title="Download Selection Status Excel">
+                                                <i class="fa-solid fa-file-excel"></i>
+                                            </a>
 
                                             <button class="btn btn-sm btn-primary"
                                                     data-bs-toggle="modal"

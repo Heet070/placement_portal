@@ -1,5 +1,5 @@
 from django import forms
-from .models import Drive, Student, Company, Profile, Branch
+from .models import Drive, Student, Company, Profile, Branch, InterviewRound
 
 
 class DriveStep1Form(forms.ModelForm):
@@ -184,4 +184,15 @@ class BranchForm(forms.ModelForm):
         widgets = {
             'branch_id': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. BTECH_CSE'}),
             'branch_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Branch Name (e.g. Computer Science)'}),
+        }
+
+
+class InterviewRoundForm(forms.ModelForm):
+    """Form for adding/editing an interview round."""
+    class Meta:
+        model = InterviewRound
+        fields = ['round_name', 'round_type']
+        widgets = {
+            'round_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. OA Shortlist'}),
+            'round_type': forms.Select(attrs={'class': 'form-select'}),
         }

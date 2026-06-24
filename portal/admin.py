@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Branch, Drive, Student, Company, Profile
+from .models import Branch, Drive, Student, Company, Profile, InterviewRound, RoundStudent
 
 
 @admin.register(Branch)
@@ -40,3 +40,17 @@ class ProfileAdmin(admin.ModelAdmin):
     list_display = ('profile_id', 'profile_name', 'cmp', 'ctc', 'stipend')
     list_filter = ('cmp',)
     search_fields = ('profile_name',)
+
+
+@admin.register(InterviewRound)
+class InterviewRoundAdmin(admin.ModelAdmin):
+    list_display = ('round_id', 'round_name', 'profile', 'round_number', 'round_type', 'is_final')
+    list_filter = ('round_type', 'is_final')
+    search_fields = ('round_name', 'profile__profile_name')
+
+
+@admin.register(RoundStudent)
+class RoundStudentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'round', 'student')
+    search_fields = ('student__std_name', 'student__student_id', 'round__round_name')
+

@@ -1,0 +1,211 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header/Title Card with Export Button -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1 text-muted">
+                    <li class="breadcrumb-item"><a href="{% url 'students' %}" class="text-navy text-decoration-none">Students</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ student.std_name }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 fw-bold text-navy mb-0">Student Profile & Journey</h1>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'export_student_detail' student.student_id %}" class="btn btn-success rounded-pill px-4 shadow-sm">
+                <i class="fa-solid fa-file-excel me-2"></i>Export Student History
+            </a>
+            <a href="{% url 'students' %}" class="btn btn-outline-navy rounded-pill px-4">
+                <i class="fa-solid fa-arrow-left me-2"></i>Back to List
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left Column: Student Details Card -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+                <div class="card-header bg-navy text-white text-center py-4">
+                    <div class="fs-1 mb-2"><i class="fa-solid fa-user-graduate"></i></div>
+                    <h4 class="fw-bold mb-1">{{ student.std_name }}</h4>
+                    <p class="mb-0 opacity-75">ID: <strong>{{ student.student_id }}</strong></p>
+                </div>
+                <div class="card-body p-4">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                            <span class="text-muted"><i class="fa-solid fa-code-branch me-2 text-navy"></i>Branch</span>
+                            <span class="fw-bold text-navy">{{ student.branch.branch_name }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                            <span class="text-muted"><i class="fa-solid fa-star me-2 text-navy"></i>CPI</span>
+                            <span class="fw-bold text-navy">{{ student.cpi }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                            <span class="text-muted"><i class="fa-solid fa-route me-2 text-navy"></i>Placement Drive</span>
+                            <span class="fw-bold text-navy">{{ student.drive.drive_name }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3">
+                            <span class="text-muted"><i class="fa-solid fa-circle-info me-2 text-navy"></i>Status</span>
+                            <span>
+                                {% if student.placement_status == 'Placed' %}
+                                    <span class="badge bg-success rounded-pill px-3 py-1.5 fs-7"><i class="fa-solid fa-circle-check me-1"></i>Placed</span>
+                                {% elif student.placement_status == 'Summer Internship' %}
+                                    <span class="badge bg-info text-navy rounded-pill px-3 py-1.5 fs-7"><i class="fa-solid fa-briefcase me-1"></i>Internship</span>
+                                {% else %}
+                                    <span class="badge bg-secondary rounded-pill px-3 py-1.5 fs-7">Unplaced</span>
+                                {% endif %}
+                            </span>
+                        </li>
+                        {% if student.company %}
+                        <li class="list-group-item px-0 py-3">
+                            <div class="text-muted mb-1"><i class="fa-solid fa-building me-2 text-navy"></i>Placed Company</div>
+                            <div class="fw-bold text-navy fs-5">{{ student.company.cmp_name }}</div>
+                            {% if student.profile %}
+                            <div class="small text-muted">{{ student.profile.profile_name }} ({{ student.profile.get_offer_type_display }})</div>
+                            {% endif %}
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Stats + Journey -->
+        <div class="col-lg-8">
+            <!-- Summary Stats Counters -->
+            <div class="row g-3 mb-4">
+                <div class="col-sm-4">
+                    <div class="card border-0 shadow-sm rounded-4 text-center p-3 bg-white">
+                        <div class="fs-1 text-primary mb-1"><i class="fa-solid fa-file-invoice"></i></div>
+                        <h3 class="fw-bold text-navy mb-0">{{ total_applications }}</h3>
+                        <span class="text-muted small">Applications</span>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="card border-0 shadow-sm rounded-4 text-center p-3 bg-white">
+                        <div class="fs-1 text-info mb-1"><i class="fa-solid fa-desktop"></i></div>
+                        <h3 class="fw-bold text-navy mb-0">{{ total_shortlists }}</h3>
+                        <span class="text-muted small">Shortlisted for Interviews</span>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="card border-0 shadow-sm rounded-4 text-center p-3 bg-white">
+                        <div class="fs-1 text-success mb-1"><i class="fa-solid fa-trophy"></i></div>
+                        <h3 class="fw-bold text-navy mb-0">{{ total_selections }}</h3>
+                        <span class="text-muted small">Selected Offer</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recruitment Timeline Journey -->
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-white border-0 pt-4 pb-0">
+                    <h5 class="fw-bold text-navy"><i class="fa-solid fa-route me-2"></i>Recruitment History & Journey</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% for item in journey %}
+                    <div class="card border border-light-subtle rounded-3 mb-4 overflow-hidden">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <h6 class="fw-bold text-navy mb-1">{{ item.profile.cmp.cmp_name }}</h6>
+                                <span class="small text-muted">{{ item.profile.profile_name }} &bull; CTC: {{ item.profile.ctc }} LPA</span>
+                            </div>
+                            <div>
+                                {% if item.is_selected %}
+                                    <span class="badge bg-success rounded-pill px-3 py-1.5"><i class="fa-solid fa-trophy me-1"></i>Selected</span>
+                                {% elif item.is_ended %}
+                                    <span class="badge bg-danger rounded-pill px-3 py-1.5"><i class="fa-solid fa-circle-xmark me-1"></i>Ended</span>
+                                {% elif item.round_statuses.last.status == 'Eliminated' or item.round_statuses.first.status == 'Eliminated' %}
+                                    <!-- If eliminated in any round -->
+                                    <span class="badge bg-danger rounded-pill px-3 py-1.5"><i class="fa-solid fa-circle-xmark me-1"></i>Eliminated</span>
+                                {% else %}
+                                    <span class="badge bg-secondary rounded-pill px-3 py-1.5"><i class="fa-solid fa-clock me-1"></i>In Progress</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="timeline">
+                                {% for r_status in item.round_statuses %}
+                                <div class="timeline-item d-flex mb-3 align-items-start">
+                                    <div class="timeline-icon me-3 mt-1">
+                                        {% if r_status.status == 'Cleared' %}
+                                            <span class="badge bg-success rounded-circle p-2 d-inline-flex justify-content-center align-items-center" style="width: 28px; height: 28px;">
+                                                <i class="fa-solid fa-check text-white"></i>
+                                            </span>
+                                        {% elif r_status.status == 'Eliminated' %}
+                                            <span class="badge bg-danger rounded-circle p-2 d-inline-flex justify-content-center align-items-center" style="width: 28px; height: 28px;">
+                                                <i class="fa-solid fa-xmark text-white"></i>
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary rounded-circle p-2 d-inline-flex justify-content-center align-items-center" style="width: 28px; height: 28px;">
+                                                <i class="fa-solid fa-clock text-white"></i>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="timeline-content flex-grow-1">
+                                        <div class="fw-bold text-navy mb-0">{{ r_status.round.round_name }}</div>
+                                        <span class="small text-muted">
+                                            Type: {{ r_status.round.get_round_type_display }} &bull;
+                                            Status: <strong>
+                                                {% if r_status.status == 'Cleared' %}
+                                                    Shortlisted / Cleared
+                                                {% elif r_status.status == 'Eliminated' %}
+                                                    Did not advance
+                                                {% else %}
+                                                    Pending
+                                                {% endif %}
+                                            </strong>
+                                        </span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-circle-info fs-1 mb-3 text-secondary d-block"></i>
+                        <p class="fs-5 mb-0">No interview history found for this student.</p>
+                        <p class="small text-muted">Students will appear here once they are added to any profile's recruitment round.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 10px;
+    }
+    .timeline::before {
+        content: '';
+        position: absolute;
+        top: 10px;
+        left: 23px;
+        bottom: 20px;
+        width: 2px;
+        background-color: #e9ecef;
+        z-index: 0;
+    }
+    .timeline-item {
+        position: relative;
+        z-index: 1;
+    }
+    .btn-outline-navy {
+        color: var(--navy);
+        border-color: var(--navy);
+    }
+    .btn-outline-navy:hover {
+        background-color: var(--navy);
+        color: white;
+    }
+</style>
+{% endblock %}

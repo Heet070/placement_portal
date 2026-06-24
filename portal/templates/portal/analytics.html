@@ -106,7 +106,7 @@
                         <div class="card border-0 shadow-sm h-100">
                             <div class="card-body text-center py-3">
                                 <div class="fs-2 fw-bold text-success">
-                                    {% if ds.avg_ctc %}₹{{ ds.avg_ctc }} L{% else %}—{% endif %}
+                                    {% if ds.avg_ctc %}₹{{ ds.avg_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}{% else %}—{% endif %}
                                 </div>
                                 <div class="text-muted small">
                                     Avg {% if ds.is_si %}Stipend{% else %}Package{% endif %} (Overall)
@@ -118,7 +118,7 @@
                         <div class="card border-0 shadow-sm h-100">
                             <div class="card-body text-center py-3">
                                 <div class="fs-2 fw-bold text-primary">
-                                    {% if ds.median_ctc %}₹{{ ds.median_ctc }} L{% else %}—{% endif %}
+                                    {% if ds.median_ctc %}₹{{ ds.median_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}{% else %}—{% endif %}
                                 </div>
                                 <div class="text-muted small">
                                     Median {% if ds.is_si %}Stipend{% else %}Package{% endif %} (Overall)
@@ -130,7 +130,7 @@
                         <div class="card border-0 shadow-sm h-100">
                             <div class="card-body text-center py-3">
                                 <div class="fs-2 fw-bold" style="color:#8e44ad;">
-                                    {% if ds.highest_ctc %}₹{{ ds.highest_ctc }} L{% else %}—{% endif %}
+                                    {% if ds.highest_ctc %}₹{{ ds.highest_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}{% else %}—{% endif %}
                                 </div>
                                 <div class="text-muted small">
                                     Highest {% if ds.is_si %}Stipend{% else %}Package{% endif %}
@@ -204,17 +204,17 @@
                                             </div>
                                         </td>
                                         <td class="text-center">
-                                            {% if b.avg_ctc %}<span class="fw-semibold text-success">₹{{ b.avg_ctc }} L</span>
-                                            {% else %}<span class="text-muted">—</span>{% endif %}
-                                        </td>
-                                        <td class="text-center">
-                                            {% if b.median_ctc %}<span class="fw-semibold text-primary">₹{{ b.median_ctc }} L</span>
-                                            {% else %}<span class="text-muted">—</span>{% endif %}
-                                        </td>
-                                        <td class="text-center">
-                                            {% if b.highest_ctc %}<span class="fw-semibold" style="color:#8e44ad;">₹{{ b.highest_ctc }} L</span>
-                                            {% else %}<span class="text-muted">—</span>{% endif %}
-                                        </td>
+                                             {% if b.avg_ctc %}<span class="fw-semibold text-success">₹{{ b.avg_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}</span>
+                                             {% else %}<span class="text-muted">—</span>{% endif %}
+                                         </td>
+                                         <td class="text-center">
+                                             {% if b.median_ctc %}<span class="fw-semibold text-primary">₹{{ b.median_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}</span>
+                                             {% else %}<span class="text-muted">—</span>{% endif %}
+                                         </td>
+                                         <td class="text-center">
+                                             {% if b.highest_ctc %}<span class="fw-semibold" style="color:#8e44ad;">₹{{ b.highest_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}</span>
+                                             {% else %}<span class="text-muted">—</span>{% endif %}
+                                         </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -231,9 +231,9 @@
                                         {% endif %}
                                         <td class="text-center fw-bold">{{ ds.unplaced }}</td>
                                         <td class="text-center fw-bold">{{ ds.overall_pct }}%</td>
-                                        <td class="text-center fw-bold">{% if ds.avg_ctc %}₹{{ ds.avg_ctc }} L{% else %}—{% endif %}</td>
-                                        <td class="text-center fw-bold">{% if ds.median_ctc %}₹{{ ds.median_ctc }} L{% else %}—{% endif %}</td>
-                                        <td class="text-center fw-bold">{% if ds.highest_ctc %}₹{{ ds.highest_ctc }} L{% else %}—{% endif %}</td>
+                                        <td class="text-center fw-bold">{% if ds.avg_ctc %}₹{{ ds.avg_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}{% else %}—{% endif %}</td>
+                                        <td class="text-center fw-bold">{% if ds.median_ctc %}₹{{ ds.median_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}{% else %}—{% endif %}</td>
+                                        <td class="text-center fw-bold">{% if ds.highest_ctc %}₹{{ ds.highest_ctc }}{% if ds.is_si %} K{% else %} L{% endif %}{% else %}—{% endif %}</td>
                                     </tr>
                                 </tfoot>
                             </table>

@@ -91,7 +91,11 @@
                         {% for student in students %}
                         <tr data-id="{{ student.student_id }}">
                             <td class="align-middle">{{ student.student_id }}</td>
-                            <td class="align-middle fw-bold">{{ student.std_name }}</td>
+                            <td class="align-middle fw-bold">
+                                <a href="{% url 'student_detail' student.student_id %}" class="text-decoration-none text-navy hover-underline">
+                                    {{ student.std_name }}
+                                </a>
+                            </td>
                             <td class="align-middle">{{ student.branch.branch_name }}</td>
                             <td class="align-middle">{{ student.drive.drive_name }}</td>
                             <td class="align-middle">{{ student.cpi }}</td>
@@ -120,6 +124,9 @@
                             </td>
                             <td class="align-middle">
                                 <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'student_detail' student.student_id %}" class="btn btn-outline-info" title="View Journey">
+                                        <i class="fa fa-eye"></i>
+                                    </a>
                                     <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStudentModal{{ student.student_id }}">
                                         <i class="fa fa-edit"></i>
                                     </button>

@@ -3,10 +3,11 @@ import json
 import os
 import io
 import zipfile
+import pandas as pd
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
-from django.db.models import Count, Q, Avg, Sum
+from django.db.models import Count, Q, Avg, Sum, Max
 from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -18,11 +19,12 @@ try:
 except ImportError:
     Anthropic = None
 
-from .models import Drive, Student, Company, Profile, Branch
+from .models import Drive, Student, Company, Profile, Branch, InterviewRound, RoundStudent
 from .decorators import login_required
 from .forms import (
     DriveStep1Form, BranchSelectionForm, StudentForm, 
-    CompanyForm, ProfileForm, CSVUploadForm, BranchForm, EditDriveForm
+    CompanyForm, ProfileForm, CSVUploadForm, BranchForm, EditDriveForm,
+    InterviewRoundForm
 )
 
 @login_required
@@ -534,7 +536,10 @@ def analytics(request):
             ctc_qs = students.filter(placement_status__in=['Placed', 'PPO'], profile__isnull=False).select_related('profile')
             primary_count = placed + ppo
 
-        ctcs = [float(s.profile.ctc) for s in ctc_qs if s.profile and s.profile.ctc]
+        if is_si:
+            ctcs = [float(s.profile.stipend) / 1000.0 for s in ctc_qs if s.profile and s.profile.stipend]
+        else:
+            ctcs = [float(s.profile.ctc) for s in ctc_qs if s.profile and s.profile.ctc]
         avg_ctc = round(sum(ctcs) / len(ctcs), 2) if ctcs else 0
         sorted_ctcs = sorted(ctcs)
         n = len(sorted_ctcs)
@@ -558,7 +563,10 @@ def analytics(request):
                 b_ctc_qs = b_stu.filter(placement_status__in=['Placed','PPO'], profile__isnull=False).select_related('profile')
                 b_primary = b_placed + b_ppo
 
-            b_ctcs = [float(s.profile.ctc) for s in b_ctc_qs if s.profile and s.profile.ctc]
+            if is_si:
+                b_ctcs = [float(s.profile.stipend) / 1000.0 for s in b_ctc_qs if s.profile and s.profile.stipend]
+            else:
+                b_ctcs = [float(s.profile.ctc) for s in b_ctc_qs if s.profile and s.profile.ctc]
             b_avg = round(sum(b_ctcs)/len(b_ctcs),2) if b_ctcs else 0
             b_sorted = sorted(b_ctcs)
             bn = len(b_sorted)
@@ -753,5 +761,665 @@ def text_to_sql_report(request):
             import traceback
             traceback.print_exc()
             return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
+            
+    return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+
+
+# ── Profile Rounds ──
+@login_required
+def profile_rounds(request, profile_id):
+    profile = get_object_or_404(Profile, pk=profile_id)
+    rounds = profile.rounds.all().order_by('round_number')
+    
+    # Pre-populate round student choices for manual adding
+    drive = profile.cmp.drive
+    drive_students = Student.objects.filter(drive=drive)
+    if profile.branches.exists():
+        drive_students = drive_students.filter(branch__in=profile.branches.all())
+    
+    for r in rounds:
+        r.existing_student_ids = set(r.round_students.values_list('student_id', flat=True))
+        if r.round_number == 1:
+            r.eligible_students = drive_students.exclude(student_id__in=r.existing_student_ids).order_by('std_name')
+        else:
+            prev_round = rounds.filter(round_number=r.round_number - 1).first()
+            if prev_round:
+                prev_student_ids = prev_round.round_students.values_list('student_id', flat=True)
+                r.eligible_students = Student.objects.filter(student_id__in=prev_student_ids).exclude(student_id__in=r.existing_student_ids).order_by('std_name')
+            else:
+                r.eligible_students = Student.objects.none()
+
+    context = {
+        'profile': profile,
+        'rounds': rounds,
+        'round_form': InterviewRoundForm(),
+        'csv_form': CSVUploadForm(),
+    }
+    return render(request, 'portal/profile_rounds.html', context)
+
+
+@login_required
+def add_round(request, profile_id):
+    profile = get_object_or_404(Profile, pk=profile_id)
+    if request.method == 'POST':
+        form = InterviewRoundForm(request.POST)
+        if form.is_valid():
+            round_obj = form.save(commit=False)
+            round_obj.profile = profile
+            max_num = profile.rounds.aggregate(Max('round_number'))['round_number__max'] or 0
+            round_obj.round_number = max_num + 1
+            round_obj.save()
+            messages.success(request, f"Round '{round_obj.round_name}' added successfully.")
+        else:
+            for error in form.errors.values():
+                messages.error(request, str(error))
+    return redirect('profile_rounds', profile_id=profile_id)
+
+
+@login_required
+def edit_round(request, round_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    if request.method == 'POST':
+        form = InterviewRoundForm(request.POST, instance=round_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Round updated successfully.")
+        else:
+            for error in form.errors.values():
+                messages.error(request, str(error))
+    return redirect('profile_rounds', profile_id=round_obj.profile.profile_id)
+
+
+@login_required
+def delete_round(request, round_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    profile = round_obj.profile
+    if round_obj.round_type == 'applications':
+        messages.error(request, "The 'Applications' round cannot be deleted.")
+        return redirect('profile_rounds', profile_id=profile.profile_id)
+    
+    if request.method == 'POST':
+        round_number = round_obj.round_number
+        round_obj.delete()
+        
+        # Re-number subsequent rounds
+        subsequent_rounds = profile.rounds.filter(round_number__gt=round_number)
+        for r in subsequent_rounds:
+            r.round_number -= 1
+            r.save()
+            
+        messages.success(request, "Round deleted successfully.")
+    return redirect('profile_rounds', profile_id=profile.profile_id)
+
+
+@csrf_exempt
+@login_required
+def reorder_rounds(request, profile_id):
+    profile = get_object_or_404(Profile, pk=profile_id)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            round_ids = data.get('round_ids', [])
+            
+            with transaction.atomic():
+                for idx, r_id in enumerate(round_ids, start=1):
+                    InterviewRound.objects.filter(pk=r_id, profile=profile).update(round_number=idx)
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+
+@login_required
+def upload_round_students_csv(request, round_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    if request.method == 'POST':
+        form = CSVUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            csv_file = form.cleaned_data['csv_file']
+            try:
+                decoded_file = csv_file.read().decode('utf-8').splitlines()
+                reader = csv.DictReader(decoded_file)
+                
+                count = 0
+                errors = []
+                
+                profile = round_obj.profile
+                drive = profile.cmp.drive
+                
+                if round_obj.round_number == 1:
+                    eligible_qs = Student.objects.filter(drive=drive)
+                    if profile.branches.exists():
+                        eligible_qs = eligible_qs.filter(branch__in=profile.branches.all())
+                    eligible_ids = set(eligible_qs.values_list('student_id', flat=True))
+                else:
+                    prev_round = profile.rounds.filter(round_number=round_obj.round_number - 1).first()
+                    if prev_round:
+                        eligible_ids = set(prev_round.round_students.values_list('student_id', flat=True))
+                    else:
+                        eligible_ids = set()
+
+                existing_ids = set(round_obj.round_students.values_list('student_id', flat=True))
+
+                with transaction.atomic():
+                    for row_idx, row in enumerate(reader, start=2):
+                        student_id = row.get('student_id')
+                        if not student_id:
+                            errors.append(f"Row {row_idx}: Missing student_id.")
+                            continue
+                        
+                        student_id = student_id.strip()
+                        if student_id in existing_ids:
+                            continue
+                        
+                        if student_id not in eligible_ids:
+                            if round_obj.round_number == 1:
+                                errors.append(f"Row {row_idx}: Student '{student_id}' is not eligible/in drive for this profile.")
+                            else:
+                                errors.append(f"Row {row_idx}: Student '{student_id}' was not in previous round.")
+                            continue
+                        
+                        student = Student.objects.get(pk=student_id)
+                        RoundStudent.objects.create(round=round_obj, student=student)
+                        count += 1
+                
+                if errors:
+                    messages.warning(request, f"Uploaded {count} students. Issues: " + "; ".join(errors[:5]))
+                else:
+                    messages.success(request, f"Successfully uploaded {count} students.")
+            except Exception as e:
+                messages.error(request, f"Error processing CSV: {str(e)}")
+    return redirect('profile_rounds', profile_id=round_obj.profile.profile_id)
+
+
+@login_required
+def add_round_student(request, round_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    if request.method == 'POST':
+        student_ids = request.POST.getlist('student_ids')
+        single_student_id = request.POST.get('student_id')
+        if single_student_id and single_student_id not in student_ids:
+            student_ids.append(single_student_id)
+            
+        student_ids = [s_id.strip() for s_id in student_ids if s_id.strip()]
+        if not student_ids:
+            messages.error(request, "Please select at least one student.")
+            return redirect('profile_rounds', profile_id=round_obj.profile.profile_id)
+            
+        profile = round_obj.profile
+        drive = profile.cmp.drive
+        
+        # Precautionary check of eligible students
+        if round_obj.round_number == 1:
+            eligible_qs = Student.objects.filter(drive=drive)
+            if profile.branches.exists():
+                eligible_qs = eligible_qs.filter(branch__in=profile.branches.all())
+            eligible_ids = set(eligible_qs.values_list('student_id', flat=True))
+        else:
+            prev_round = profile.rounds.filter(round_number=round_obj.round_number - 1).first()
+            if prev_round:
+                eligible_ids = set(prev_round.round_students.values_list('student_id', flat=True))
+            else:
+                eligible_ids = set()
+
+        existing_ids = set(round_obj.round_students.values_list('student_id', flat=True))
+        
+        added_count = 0
+        skipped_count = 0
+        error_messages = []
+        
+        with transaction.atomic():
+            for student_id in student_ids:
+                if student_id in existing_ids:
+                    skipped_count += 1
+                    continue
+                if student_id not in eligible_ids:
+                    if round_obj.round_number == 1:
+                        error_messages.append(f"Student {student_id} is not in drive or branch is not eligible.")
+                    else:
+                        error_messages.append(f"Student {student_id} was not in previous round.")
+                    continue
+                
+                try:
+                    student = Student.objects.get(pk=student_id)
+                    RoundStudent.objects.create(round=round_obj, student=student)
+                    added_count += 1
+                except Student.DoesNotExist:
+                    error_messages.append(f"Student {student_id} does not exist.")
+                    
+        if added_count > 0:
+            messages.success(request, f"Successfully added {added_count} student(s) to this round.")
+        if skipped_count > 0:
+            messages.info(request, f"{skipped_count} student(s) were already in this round.")
+        if error_messages:
+            messages.warning(request, "Some students could not be added: " + "; ".join(error_messages[:5]))
+            
+    return redirect('profile_rounds', profile_id=round_obj.profile.profile_id)
+
+
+@login_required
+def remove_round_student(request, round_id, student_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    student = get_object_or_404(Student, pk=student_id)
+    if request.method == 'POST':
+        RoundStudent.objects.filter(round=round_obj, student=student).delete()
+        subsequent_rounds = InterviewRound.objects.filter(
+            profile=round_obj.profile,
+            round_number__gt=round_obj.round_number
+        )
+        RoundStudent.objects.filter(round__in=subsequent_rounds, student=student).delete()
+        messages.success(request, f"Removed student {student.std_name} from this round and subsequent rounds.")
+    return redirect('profile_rounds', profile_id=round_obj.profile.profile_id)
+
+
+@login_required
+def toggle_round_final(request, round_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    profile = round_obj.profile
+    if request.method == 'POST':
+        if not round_obj.is_final:
+            with transaction.atomic():
+                profile.rounds.update(is_final=False)
+                round_obj.is_final = True
+                round_obj.save()
+                
+                # Reset previous selections for this profile
+                Student.all_objects.filter(profile=profile).update(
+                    placement_status='Unplaced',
+                    company=None,
+                    profile=None
+                )
+                
+                count = 0
+                for rs in round_obj.round_students.select_related('student'):
+                    student = rs.student
+                    if student.drive.is_si:
+                        student.placement_status = 'Summer Internship'
+                    else:
+                        student.placement_status = 'Placed'
+                    student.company = profile.cmp
+                    student.profile = profile
+                    student.save()
+                    count += 1
+            messages.success(request, f"Round marked as Final Results. Synced {count} students to placement status.")
+        else:
+            with transaction.atomic():
+                round_obj.is_final = False
+                round_obj.save()
+                Student.all_objects.filter(profile=profile).update(
+                    placement_status='Unplaced',
+                    company=None,
+                    profile=None
+                )
+            messages.success(request, f"Round unmarked as Final Results. Placement status reset for these students.")
+            
+    return redirect('profile_rounds', profile_id=profile.profile_id)
+
+
+@login_required
+def export_round_students(request, round_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    students = Student.objects.filter(interview_rounds__round=round_obj).select_related('branch')
+    
+    data = []
+    for s in students:
+        data.append({
+            'Student ID': s.student_id,
+            'Name': s.std_name,
+            'Branch': s.branch.branch_name,
+            'CPI': s.cpi
+        })
+        
+    df = pd.DataFrame(data)
+    
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Shortlist')
+        
+    excel_buffer.seek(0)
+    response = HttpResponse(
+        excel_buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    safe_name = round_obj.round_name.replace(" ", "_")
+    response['Content-Disposition'] = f'attachment; filename="{safe_name}_Shortlist.xlsx"'
+    return response
+
+
+@login_required
+def export_profile_journey_excel(request, profile_id):
+    import openpyxl
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    profile = get_object_or_404(Profile, pk=profile_id)
+    rounds = list(profile.rounds.all().order_by('round_number'))
+    
+    if not rounds:
+        messages.error(request, "This profile has no rounds.")
+        return redirect('companies')
+        
+    first_round = rounds[0]
+    # Get all students who applied (i.e. participated in the first round)
+    applied_students = Student.objects.filter(interview_rounds__round=first_round).select_related('branch').order_by('student_id')
+    
+    # Other rounds (excluding the first one, e.g. "Applications")
+    other_rounds = rounds[1:]
+    
+    # Get all RoundStudent mapping for database query optimization
+    round_student_pairs = set(
+        RoundStudent.objects.filter(round__profile=profile).values_list('round_id', 'student_id')
+    )
+    
+    # Determine which round is the final round
+    final_round = next((r for r in reversed(rounds) if r.is_final), rounds[-1])
+    
+    # Create workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Selection Status"
+    
+    # Build headers
+    headers = ['Sr No.', 'Student ID', 'Student Name', 'Branch', 'Student CPI']
+    for r in other_rounds:
+        headers.append(r.round_name)
+    
+    ws.append(headers)
+    
+    # Define styles - Yellow for header, Green/Red for rounds
+    yellow_fill = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+    green_fill = PatternFill(start_color='00FF00', end_color='00FF00', fill_type='solid')
+    red_fill = PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid')
+    
+    header_font = Font(name='Calibri', size=11, bold=True)
+    data_font = Font(name='Calibri', size=11, bold=False)
+    
+    thin_border = Border(
+        left=Side(style='thin', color='000000'),
+        right=Side(style='thin', color='000000'),
+        top=Side(style='thin', color='000000'),
+        bottom=Side(style='thin', color='000000')
+    )
+    
+    # Apply header formatting
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = yellow_fill
+        cell.font = header_font
+        cell.border = thin_border
+        cell.alignment = Alignment(horizontal='center' if col_idx != 3 and col_idx != 4 else 'left', vertical='center')
+        
+    # Add data rows
+    for idx, s in enumerate(applied_students, 1):
+        row_data = [
+            idx,
+            s.student_id,
+            s.std_name,
+            s.branch.branch_name,
+            float(s.cpi) if s.cpi else 0.0
+        ]
+        # Append empty cells for rounds
+        for _ in other_rounds:
+            row_data.append(None)
+        
+        ws.append(row_data)
+        row_idx = idx + 1
+        
+        # Apply standard styles for first 5 cells
+        for col_idx in range(1, 6):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.font = data_font
+            cell.border = thin_border
+            if col_idx in [1, 2, 5]:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            else:
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+                
+        # Apply round status formatting (Green if in round, Red if not)
+        col_offset = 6
+        for r_idx, r in enumerate(other_rounds):
+            cell = ws.cell(row=row_idx, column=col_offset + r_idx)
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            if (r.round_id, s.student_id) in round_student_pairs:
+                cell.fill = green_fill
+            else:
+                cell.fill = red_fill
+            
+    # Set explicit column widths to match user's template
+    col_widths = {
+        'A': 12,
+        'B': 14,
+        'C': 16,
+        'D': 14,
+        'E': 15
+    }
+    for col_letter, width in col_widths.items():
+        ws.column_dimensions[col_letter].width = width
+        
+    for r_idx in range(len(other_rounds)):
+        col_letter = get_column_letter(6 + r_idx)
+        ws.column_dimensions[col_letter].width = 16
+    
+    # Save to buffer
+    excel_buffer = io.BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
+    
+    # Send file
+    response = HttpResponse(
+        excel_buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    safe_name = profile.profile_name.replace(" ", "_")
+    company_name = profile.cmp.cmp_name.replace(" ", "_")
+    response['Content-Disposition'] = f'attachment; filename="{company_name}_{safe_name}_status.xlsx"'
+    return response
+
+
+@login_required
+def toggle_interview_shortlist(request, round_id):
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    if request.method == 'POST':
+        round_obj.is_interview_shortlist = not round_obj.is_interview_shortlist
+        round_obj.save()
+        if round_obj.is_interview_shortlist:
+            messages.success(request, f"'{round_obj.round_name}' marked as Interview Shortlist round.")
+        else:
+            messages.success(request, f"'{round_obj.round_name}' unmarked as Interview Shortlist round.")
+    return redirect('profile_rounds', profile_id=round_obj.profile.profile_id)
+
+
+@login_required
+def download_round_csv_template(request, round_id):
+    """Download a sample CSV template showing the expected format for round student uploads."""
+    round_obj = get_object_or_404(InterviewRound, pk=round_id)
+    response = HttpResponse(content_type='text/csv')
+    safe_name = round_obj.round_name.replace(" ", "_")
+    response['Content-Disposition'] = f'attachment; filename="{safe_name}_upload_template.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['student_id'])
+    writer.writerow(['EXAMPLE_STU001'])
+    writer.writerow(['EXAMPLE_STU002'])
+    return response
+
+
+@login_required
+def student_detail(request, student_id):
+    student = get_object_or_404(Student.all_objects, pk=student_id)
+    
+    round_students = RoundStudent.objects.filter(student=student).select_related(
+        'round__profile__cmp', 'round__profile'
+    )
+    
+    profile_rounds_map = {}
+    for rs in round_students:
+        prof = rs.round.profile
+        if prof.profile_id not in profile_rounds_map:
+            profile_rounds_map[prof.profile_id] = {
+                'profile': prof,
+                'rounds_present': [],
+            }
+        profile_rounds_map[prof.profile_id]['rounds_present'].append(rs.round)
+        
+    journey = []
+    total_applications = 0
+    total_shortlists = 0
+    total_selections = 0
+    
+    for prof_id, info in profile_rounds_map.items():
+        prof = info['profile']
+        rounds_present = info['rounds_present']
+        
+        all_rounds = list(prof.rounds.all().order_by('round_number'))
+        rounds_present_ids = {r.round_id for r in rounds_present}
+        max_round_num = max([r.round_number for r in rounds_present], default=0)
+        
+        is_applied = any(r.round_type == 'applications' for r in rounds_present)
+        if is_applied:
+            total_applications += 1
+            
+        is_shortlisted = any(r.is_interview_shortlist and r.round_id in rounds_present_ids for r in all_rounds)
+        if is_shortlisted:
+            total_shortlists += 1
+            
+        is_selected = any(r.is_final and r.round_id in rounds_present_ids for r in all_rounds)
+        if is_selected:
+            total_selections += 1
+            
+        round_statuses = []
+        is_ended = any(r.is_final for r in all_rounds)
+        for r in all_rounds:
+            cleared = r.round_id in rounds_present_ids
+            if cleared:
+                r_status = 'Cleared'
+            else:
+                if is_ended:
+                    r_status = 'Eliminated'
+                else:
+                    if r.round_number > max_round_num:
+                        has_subsequent_students = RoundStudent.objects.filter(
+                            round__profile=prof,
+                            round__round_number__gte=r.round_number
+                        ).exists()
+                        if has_subsequent_students:
+                            r_status = 'Eliminated'
+                        else:
+                            r_status = 'Pending'
+                    else:
+                        r_status = 'Eliminated'
+            
+            round_statuses.append({
+                'round': r,
+                'cleared': cleared,
+                'status': r_status
+            })
+            
+        journey.append({
+            'profile': prof,
+            'round_statuses': round_statuses,
+            'is_selected': is_selected,
+            'is_ended': is_ended,
+            'max_round_num': max_round_num,
+            'cleared_count': len(rounds_present)
+        })
+        
+    context = {
+        'student': student,
+        'journey': journey,
+        'total_applications': total_applications,
+        'total_shortlists': total_shortlists,
+        'total_selections': total_selections,
+    }
+    return render(request, 'portal/student_detail.html', context)
+
+
+@login_required
+def export_student_detail(request, student_id):
+    student = get_object_or_404(Student.all_objects, pk=student_id)
+    round_students = RoundStudent.objects.filter(student=student).select_related(
+        'round__profile__cmp', 'round__profile'
+    )
+    
+    profile_rounds_map = {}
+    for rs in round_students:
+        prof = rs.round.profile
+        if prof.profile_id not in profile_rounds_map:
+            profile_rounds_map[prof.profile_id] = []
+        profile_rounds_map[prof.profile_id].append(rs.round)
+        
+    total_applications = 0
+    total_shortlists = 0
+    total_selections = 0
+    
+    journey_rows = []
+    for prof_id, rounds in profile_rounds_map.items():
+        prof = rounds[0].profile
+        all_rounds = list(prof.rounds.all().order_by('round_number'))
+        rounds_present_ids = {r.round_id for r in rounds}
+        
+        is_applied = any(r.round_type == 'applications' for r in rounds)
+        if is_applied:
+            total_applications += 1
+            
+        is_shortlisted = any(r.is_interview_shortlist and r.round_id in rounds_present_ids for r in all_rounds)
+        if is_shortlisted:
+            total_shortlists += 1
+            
+        is_selected = any(r.is_final and r.round_id in rounds_present_ids for r in all_rounds)
+        if is_selected:
+            total_selections += 1
+            
+        is_ended = any(r.is_final for r in all_rounds)
+        max_round = max([r for r in rounds], key=lambda x: x.round_number, default=None)
+        highest_round_cleared = max_round.round_name if max_round else '-'
+        
+        if is_selected:
+            status_str = "Selected"
+        else:
+            if is_ended:
+                status_str = "Ended"
+            else:
+                status_str = "In Progress"
+                
+        journey_rows.append({
+            'Company': prof.cmp.cmp_name,
+            'Profile': prof.profile_name,
+            'Offer Type': prof.get_offer_type_display() if prof.offer_type else '-',
+            'CTC (LPA)': prof.ctc,
+            'Stipend': prof.stipend or '-',
+            'Rounds Cleared': len(rounds),
+            'Highest Round Cleared': highest_round_cleared,
+            'Status': status_str
+        })
+        
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+        summary_df = pd.DataFrame([{
+            'Student ID': student.student_id,
+            'Name': student.std_name,
+            'Branch': student.branch.branch_name,
+            'CPI': student.cpi,
+            'Placement Status': student.placement_status,
+            'Company': student.company.cmp_name if student.company else '-',
+            'Profile': student.profile.profile_name if student.profile else '-',
+            'Total Applications': total_applications,
+            'Shortlisted for Interviews': total_shortlists,
+            'Total Selections': total_selections
+        }])
+        summary_df.to_excel(writer, index=False, sheet_name='Summary')
+        
+        journey_df = pd.DataFrame(journey_rows)
+        journey_df.to_excel(writer, index=False, sheet_name='Interview Journey')
+        
+    excel_buffer.seek(0)
+    response = HttpResponse(
+        excel_buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    safe_name = student.std_name.replace(" ", "_")
+    response['Content-Disposition'] = f'attachment; filename="Journey_{safe_name}.xlsx"'
+    return response
+
             
     return JsonResponse({"error": "Only POST requests are allowed"}, status=405)

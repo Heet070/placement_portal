@@ -200,8 +200,17 @@ class Profile(models.Model):
                 )
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
         self.full_clean()
         super().save(*args, **kwargs)
+        if is_new:
+            InterviewRound.objects.create(
+                profile=self,
+                round_number=1,
+                round_name='Applications',
+                round_type='applications'
+            )
+
 
 
 class AdminProfile(models.Model):
@@ -248,3 +257,46 @@ class AdminProfile(models.Model):
             and self.reset_token_expires
             and timezone.now() < self.reset_token_expires
         )
+
+
+class InterviewRound(models.Model):
+    ROUND_TYPE_CHOICES = [
+        ('applications', 'Applications'),
+        ('oa', 'OA Shortlisted'),
+        ('round', 'Round'),
+        ('gd', 'GD Round'),
+        ('technical', 'Technical Round'),
+        ('hr', 'HR Round'),
+        ('results', 'Results'),
+        ('custom', 'Custom'),
+    ]
+
+    round_id = models.AutoField(primary_key=True)
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='rounds')
+    round_number = models.PositiveIntegerField()
+    round_name = models.CharField(max_length=200)
+    round_type = models.CharField(max_length=20, choices=ROUND_TYPE_CHOICES, default='round')
+    is_final = models.BooleanField(default=False)
+    is_interview_shortlist = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'interview_round'
+        ordering = ['round_number']
+        unique_together = ['profile', 'round_number']
+
+    def __str__(self):
+        return f"{self.round_name} ({self.profile})"
+
+
+class RoundStudent(models.Model):
+    id = models.AutoField(primary_key=True)
+    round = models.ForeignKey(InterviewRound, on_delete=models.CASCADE, related_name='round_students')
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='interview_rounds')
+
+    class Meta:
+        db_table = 'round_student'
+        unique_together = ['round', 'student']
+
+    def __str__(self):
+        return f"{self.student.std_name} in {self.round.round_name}"

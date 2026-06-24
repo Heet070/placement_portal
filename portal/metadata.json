@@ -240,5 +240,82 @@
                 "blank": true
             }
         }
+    },
+    "interview_round": {
+        "model_class": "InterviewRound",
+        "verbose_name": "interview round",
+        "description": "InterviewRound(round_id, profile, round_number, round_name, round_type, is_final, is_interview_shortlist)",
+        "fields": {
+            "round_id": {
+                "type": "AutoField",
+                "nullable": false,
+                "blank": true
+            },
+            "profile": {
+                "type": "ForeignKey",
+                "nullable": false,
+                "blank": false,
+                "related_table": "profile"
+            },
+            "round_number": {
+                "type": "IntegerField",
+                "nullable": false,
+                "blank": false
+            },
+            "round_name": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false
+            },
+            "round_type": {
+                "type": "CharField",
+                "nullable": false,
+                "blank": false,
+                "choices": {
+                    "applications": "Applications",
+                    "oa": "OA Shortlisted",
+                    "round": "Round",
+                    "gd": "GD Round",
+                    "technical": "Technical Round",
+                    "hr": "HR Round",
+                    "results": "Results",
+                    "custom": "Custom"
+                }
+            },
+            "is_final": {
+                "type": "BooleanField",
+                "nullable": false,
+                "blank": false
+            },
+            "is_interview_shortlist": {
+                "type": "BooleanField",
+                "nullable": false,
+                "blank": false
+            }
+        }
+    },
+    "round_student": {
+        "model_class": "RoundStudent",
+        "verbose_name": "round student",
+        "description": "RoundStudent(id, round, student)",
+        "fields": {
+            "id": {
+                "type": "AutoField",
+                "nullable": false,
+                "blank": true
+            },
+            "round": {
+                "type": "ForeignKey",
+                "nullable": false,
+                "blank": false,
+                "related_table": "interview_round"
+            },
+            "student": {
+                "type": "ForeignKey",
+                "nullable": false,
+                "blank": false,
+                "related_table": "student"
+            }
+        }
     }
 }

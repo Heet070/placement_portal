@@ -98,8 +98,12 @@ def generate_excel_from_prompt(user_prompt):
     2. Pay close attention to enum choices (e.g. `placement_status` options: 'Unplaced', 'Placed', 'PPO', 'Summer Internship'). Match the capitalization and values exactly as defined in the metadata choices.
     3. If the user asks for 'placed' or 'placements', handle it appropriately based on the context (e.g. check for 'Placed', 'PPO', or 'Summer Internship' statuses as needed).
     4. AVOID SELECTING RAW FOREIGN KEY IDs. When the query requires displaying a reference to another table:
-       - Instead of selecting raw ID fields (like `company_id`, `branch_id`, `profile_id`, `drive_id`, `cmp_id`), perform an INNER JOIN or LEFT JOIN with the target table and select the human-readable string column (e.g. select `company.cmp_name` instead of `student.company_id`, `branch.branch_name` instead of `student.branch_id`, `profile.profile_name` instead of `student.profile_id`, and `drive.drive_name` instead of `student.drive_id`).
-       - Ensure you alias columns appropriately (e.g. `AS company_name`, `AS branch_name`, etc.) so the generated Excel headers are clean and descriptive.
+       - Instead of selecting raw ID fields (like `company_id`, `branch_id`, `profile_id`, `drive_id`, `cmp_id`, `round_id`), perform an INNER JOIN or LEFT JOIN with the target table and select the human-readable string column (e.g. select `company.cmp_name` instead of `student.company_id`, `branch.branch_name` instead of `student.branch_id`, `profile.profile_name` instead of `student.profile_id`, `drive.drive_name` instead of `student.drive_id`, `interview_round.round_name` instead of `round_student.round_id`, and `student.std_name` instead of `round_student.student_id`).
+       - Ensure you alias columns appropriately (e.g. `AS company_name`, `AS branch_name`, `AS round_name`, `AS student_name`, etc.) so the generated Excel headers are clean and descriptive.
+    5. When the user asks about recruitment rounds, shortlists, or student interview progress, query the `interview_round` and `round_student` tables. For example:
+       - To find students in a specific round, join `student` and `interview_round` via `round_student`.
+       - To check if a round is the interview shortlist, check `interview_round.is_interview_shortlist = true` or `1`.
+       - To check if a round is the final results round, check `interview_round.is_final = true` or `1`.
     """
     
     response = client.models.generate_content(
